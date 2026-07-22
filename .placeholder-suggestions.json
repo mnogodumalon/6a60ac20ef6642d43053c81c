@@ -1,0 +1,20 @@
+{
+  "ProjekteDialog.tsx": {
+    "projektname": "z. B. Website-Redesign",
+    "beschreibung": "Projektumfang, Ziele, Besonderheiten...",
+    "vorname": "z. B. Max",
+    "nachname": "z. B. Müller",
+    "startdatum": "Wann startet das Projekt?",
+    "enddatum": "Geplantes Ende wählen"
+  },
+  "AufgabenDialog.tsx": {
+    "projekt": "Welches Projekt?",
+    "titel": "z. B. Wireframes erstellen",
+    "aufgabe_beschreibung": "Was ist zu tun, Akzeptanzkriterien, Hinweise...",
+    "prioritaet": "z. B. Hoch, Mittel, Niedrig",
+    "faelligkeitsdatum": "Wann ist es fällig?",
+    "aufgabe_status": "Aktueller Stand wählen",
+    "zustaendig_vorname": "z. B. Anna",
+    "zustaendig_nachname": "z. B. Schmidt"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "entities": {
+    "Projekte": {
+      "placeholders_set": 6,
+      "defaults_keys": [
+        "startdatum",
+        "enddatum",
+        "status"
+      ],
+      "computed_keys": [],
+      "reason": "Reine Stammdaten mit zeitlichem Kontext (Start/Ende) und Status-Lookup. Keine Numerikfelder oder Applookups mit Preis-Target vorhanden — nichts berechenbar."
+    },
+    "Aufgaben": {
+      "placeholders_set": 8,
+      "defaults_keys": [
+        "faelligkeitsdatum",
+        "aufgabe_status"
+      ],
+      "computed_keys": [],
+      "reason": "Task-Management-Entity mit Projekt-Bezug (Applookup ohne Preis-Target), Priorität und Status-Lookups. Keine Numerik- oder Preis-Felder — nichts berechenbar."
+    }
+  }
+}
