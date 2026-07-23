@@ -7,17 +7,16 @@ import { ErrorBusProvider } from '@/components/ErrorBus';
 import { Layout } from '@/components/Layout';
 import DashboardOverview from '@/pages/DashboardOverview';
 import AdminPage from '@/pages/AdminPage';
-import PublicPagesAdmin from '@/pages/PublicPagesAdmin';
 import ProjektePage from '@/pages/ProjektePage';
 import ProjekteDetailPage from '@/pages/ProjekteDetailPage';
 import AufgabenPage from '@/pages/AufgabenPage';
 import AufgabenDetailPage from '@/pages/AufgabenDetailPage';
+import PublicFormProjekte from '@/pages/public/PublicForm_Projekte';
+import PublicFormAufgaben from '@/pages/public/PublicForm_Aufgaben';
+// <public:imports>
+// </public:imports>
 // <custom:imports>
 // </custom:imports>
-
-// Lazy: public pages live outside <Layout> and only load on /#/public/:slug —
-// dashboard users never pay for them, anonymous visitors skip the dashboard.
-const PublicPage = lazy(() => import('@/pages/public/PublicPage'));
 
 export default function App() {
   return (
@@ -26,7 +25,10 @@ export default function App() {
         <HashRouter>
           <ActionsProvider>
             <Routes>
-              <Route path="public/:slug" element={<Suspense fallback={null}><PublicPage /></Suspense>} />
+              <Route path="public/6a60ac10150ed11a39476862" element={<PublicFormProjekte />} />
+              <Route path="public/6a60ac133bfb4b8bb765f87b" element={<PublicFormAufgaben />} />
+              {/* <public:routes> */}
+              {/* </public:routes> */}
               <Route element={<Layout />}>
                 <Route index element={<DashboardOverview />} />
                 <Route path="projekte" element={<ProjektePage />} />
@@ -34,7 +36,6 @@ export default function App() {
                 <Route path="aufgaben" element={<AufgabenPage />} />
                 <Route path="aufgaben/:id" element={<AufgabenDetailPage />} />
                 <Route path="admin" element={<AdminPage />} />
-                <Route path="verwaltung/oeffentliche-seiten" element={<PublicPagesAdmin />} />
                 {/* <custom:routes> */}
                 {/* </custom:routes> */}
               </Route>

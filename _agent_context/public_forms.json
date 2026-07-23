@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "forms": [
+    {
+      "entity": "projekte",
+      "app_id": "6a60ac10150ed11a39476862",
+      "path": "/rest/apps/6a60ac10150ed11a39476862/records",
+      "allowed_fields": [
+        "projektname",
+        "beschreibung",
+        "vorname",
+        "nachname",
+        "startdatum",
+        "enddatum",
+        "status"
+      ],
+      "pow": true,
+      "pow_difficulty": 50000,
+      "title": "Projekte — Formular"
+    },
+    {
+      "entity": "aufgaben",
+      "app_id": "6a60ac133bfb4b8bb765f87b",
+      "path": "/rest/apps/6a60ac133bfb4b8bb765f87b/records",
+      "allowed_fields": [
+        "titel",
+        "aufgabe_beschreibung",
+        "prioritaet",
+        "faelligkeitsdatum",
+        "aufgabe_status",
+        "zustaendig_vorname",
+        "zustaendig_nachname"
+      ],
+      "pow": true,
+      "pow_difficulty": 50000,
+      "title": "Aufgaben — Formular"
+    }
+  ]
+}

@@ -328,7 +328,7 @@ export function AufgabenDialog({ open, onClose, onSubmit, defaultValues, recordI
         <Label htmlFor="projekt">Projekt <span className="text-destructive" aria-hidden="true">*</span></Label>
         <Combobox
           id="projekt"
-          placeholder="Welches Projekt?"
+          placeholder=""
           items={projekteListAll.map(r => ({
             id: r.record_id,
             label: String(r.fields.projektname ?? r.record_id),
@@ -350,7 +350,7 @@ export function AufgabenDialog({ open, onClose, onSubmit, defaultValues, recordI
         <Label htmlFor="titel">Aufgabentitel <span className="text-destructive" aria-hidden="true">*</span></Label>
         <Input
           id="titel"
-          placeholder="z. B. Wireframes erstellen"
+          placeholder=""
           value={fields.titel ?? ''}
           onChange={e => setFields(f => ({ ...f, titel: e.target.value }))}
           required
@@ -365,7 +365,7 @@ export function AufgabenDialog({ open, onClose, onSubmit, defaultValues, recordI
         <Label htmlFor="aufgabe_beschreibung">Beschreibung</Label>
         <Textarea
           id="aufgabe_beschreibung"
-          placeholder="Was ist zu tun, Akzeptanzkriterien, Hinweise..."
+          placeholder=""
           value={fields.aufgabe_beschreibung ?? ''}
           onChange={e => setFields(f => ({ ...f, aufgabe_beschreibung: e.target.value }))}
           rows={3}
@@ -426,7 +426,7 @@ export function AufgabenDialog({ open, onClose, onSubmit, defaultValues, recordI
         <Label htmlFor="faelligkeitsdatum">Fälligkeitsdatum</Label>
         <DatePicker
           id="faelligkeitsdatum"
-          placeholder="Wann ist es fällig?"
+          placeholder=""
           mode="date"
           value={fields.faelligkeitsdatum ?? null}
           onChange={v => setFields(f => ({ ...f, faelligkeitsdatum: v ?? undefined }))}
@@ -487,7 +487,7 @@ export function AufgabenDialog({ open, onClose, onSubmit, defaultValues, recordI
         <Label htmlFor="zustaendig_vorname">Vorname</Label>
         <Input
           id="zustaendig_vorname"
-          placeholder="z. B. Anna"
+          placeholder=""
           value={fields.zustaendig_vorname ?? ''}
           onChange={e => setFields(f => ({ ...f, zustaendig_vorname: e.target.value }))}
         />
@@ -498,7 +498,7 @@ export function AufgabenDialog({ open, onClose, onSubmit, defaultValues, recordI
         <Label htmlFor="zustaendig_nachname">Nachname</Label>
         <Input
           id="zustaendig_nachname"
-          placeholder="z. B. Schmidt"
+          placeholder=""
           value={fields.zustaendig_nachname ?? ''}
           onChange={e => setFields(f => ({ ...f, zustaendig_nachname: e.target.value }))}
         />

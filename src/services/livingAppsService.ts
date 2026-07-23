@@ -95,10 +95,12 @@ async function callApi(method: string, endpoint: string, data?: any, options?: C
     throw netErr;
   }
   if (!response.ok) {
-    if (response.status === 401 || response.status === 403) window.dispatchEvent(new Event('auth-error'));
+    // 401/403 go to the login screen only — never to the errorbus (repair can't fix auth).
+    const isAuthError = response.status === 401 || response.status === 403;
+    if (isAuthError) window.dispatchEvent(new Event('auth-error'));
     const { message, raw } = await parseErrorBody(response);
     const err = new LivingAppsApiError(message, response.status, raw);
-    if (!silent) {
+    if (!silent && !isAuthError) {
       window.dispatchEvent(new CustomEvent('errorbus:emit', { detail: {
         source: 'api',
         status: err.status,

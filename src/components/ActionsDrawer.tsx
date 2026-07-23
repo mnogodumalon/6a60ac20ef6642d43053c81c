@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   IconBolt, IconChevronDown, IconCode, IconDownload, IconFile, IconFileTypePdf,
@@ -6,7 +6,7 @@ import {
 } from '@tabler/icons-react';
 import { useActions } from '@/context/ActionsContext';
 import type { Action, FileAttachment } from '@/lib/actions-agent';
-import { format, parseISO } from 'date-fns';
+import { format, formatDistanceToNow, parseISO } from 'date-fns';
 import { de } from 'date-fns/locale';
 
 const TITLE = 'Werkzeuge';
@@ -15,8 +15,22 @@ const RUN_LABEL = 'Ausführen';
 const BUSY_LABEL = 'In Arbeit...';
 const DELETE_LABEL = 'Löschen';
 const SOURCE_LABEL = 'Quellcode';
+const CODE_LABEL = 'Code';
+const VIEW_CHANGES_LABEL = 'Änderungen ansehen';
 const DOWNLOAD_LABEL = 'Herunterladen';
 const FILES_LABEL = 'Dateien';
+
+const ORIGIN_LABELS: Record<string, string> = {
+  fix: 'Auto-Fix',
+  chat: 'Chat',
+  initial: 'Erstellt',
+  revert: 'Wiederhergestellt',
+};
+
+function relTime(d?: string) {
+  if (!d) return '';
+  try { return formatDistanceToNow(parseISO(d), { addSuffix: true, locale: de }); } catch { return d; }
+}
 
 function FileIcon({ mimeType }: { mimeType: string }) {
   if (mimeType === 'application/pdf') return <IconFileTypePdf size={14} className="shrink-0 text-red-500" />;
@@ -29,13 +43,14 @@ function formatDateTime(d?: string) {
   try { return format(parseISO(d), 'dd.MM.yyyy, HH:mm', { locale: de }); } catch { return d; }
 }
 
-function FileItem({ file, onDownload, onDelete }: {
+function FileItem({ file, fresh, onDownload, onDelete }: {
   file: FileAttachment;
+  fresh?: boolean;
   onDownload: (url: string, filename: string) => void;
   onDelete: (file: FileAttachment) => void;
 }) {
   return (
-    <li className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-accent/50 transition-colors">
+    <li className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors duration-500 ${fresh ? 'bg-primary/15' : 'hover:bg-accent/50'}`}>
       <FileIcon mimeType={file.mime_type} />
       <div className="flex-1 min-w-0">
         <div className="text-sm truncate">{file.filename}</div>
@@ -66,24 +81,52 @@ function FileItem({ file, onDownload, onDelete }: {
 interface ActionRowProps {
   action: Action;
   files: FileAttachment[];
+  freshFileIds: Set<string>;
   running: boolean;
   disabled: boolean;
   devMode: boolean;
+  highlight: boolean;
   onRun: (action: Action) => void;
   onDelete: (action: Action) => Promise<void>;
   onShowCode: (action: Action) => void;
+  onShowChanges: (action: Action) => void;
   onDownload: (url: string, filename: string) => void;
   onDeleteFile: (file: FileAttachment) => void;
 }
 
 function ActionRow({
-  action, files, running, disabled, devMode,
-  onRun, onDelete, onShowCode, onDownload, onDeleteFile,
+  action, files, freshFileIds, running, disabled, devMode, highlight,
+  onRun, onDelete, onShowCode, onShowChanges, onDownload, onDeleteFile,
 }: ActionRowProps) {
   const [filesOpen, setFilesOpen] = useState(false);
+  const latest = action.versions.length > 0 ? action.versions[action.versions.length - 1] : null;
+
+  // A run just produced new files: open the list so the highlight is seen
+  const hasFreshFiles = files.some(f => freshFileIds.has(`${f.app_id}/${f.identifier}`));
+  useEffect(() => {
+    if (hasFreshFiles) setFilesOpen(true);
+  }, [hasFreshFiles]);
+
+  // Arriving via highlight (code drawer ←, version/run-card title): latch
+  // the flash locally so it plays out even when the context marker clears
+  // mid-animation, center the card so it's unmissable in a long list, and
+  // open the files list — the run the user came from usually left its
+  // output there.
+  const rowRef = useRef<HTMLDivElement | null>(null);
+  const [flash, setFlash] = useState(false);
+  useEffect(() => {
+    if (!highlight) return;
+    setFlash(true);
+    setFilesOpen(true);
+    rowRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [highlight]);
 
   return (
-    <div className="rounded-2xl border bg-card shadow-sm overflow-hidden">
+    <div
+      ref={rowRef}
+      onAnimationEnd={(e) => { if (e.animationName === 'action-return') setFlash(false); }}
+      className={`rounded-2xl border bg-card shadow-sm overflow-hidden${flash ? ' animate-[action-return_2s_ease-out_0.25s_both]' : ''}`}
+    >
       <div className="flex items-start gap-3 p-4">
         <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
           <IconBolt size={18} />
@@ -97,15 +140,28 @@ function ActionRow({
             <p className="text-[11px] font-mono text-muted-foreground/70 mt-1 truncate">{action.identifier}</p>
           )}
         </div>
-        <button
-          type="button"
-          onClick={() => onRun(action)}
-          disabled={disabled}
-          className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          {running ? <IconLoader2 size={14} className="animate-spin" /> : <IconPlayerPlay size={14} />}
-          <span className="hidden sm:inline">{running ? BUSY_LABEL : RUN_LABEL}</span>
-        </button>
+        <div className="shrink-0 flex flex-col items-stretch gap-1.5">
+          <button
+            type="button"
+            onClick={() => onRun(action)}
+            disabled={disabled}
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {running ? <IconLoader2 size={14} className="animate-spin" /> : <IconPlayerPlay size={14} />}
+            <span className="hidden sm:inline">{running ? BUSY_LABEL : RUN_LABEL}</span>
+          </button>
+          {devMode && (
+            <button
+              type="button"
+              onClick={() => onShowCode(action)}
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors"
+              title={SOURCE_LABEL}
+            >
+              <IconCode size={14} />
+              <span className="hidden sm:inline">{CODE_LABEL}</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {(files.length > 0 || devMode) && (
@@ -123,16 +179,19 @@ function ActionRow({
           ) : (
             <span />
           )}
-          <span className="flex-1" />
-          {devMode && (
+          {devMode && latest && action.current_version > 0 ? (
             <button
               type="button"
-              onClick={() => onShowCode(action)}
-              className="inline-flex items-center justify-center h-8 w-8 rounded-lg text-muted-foreground hover:bg-accent transition-colors"
-              title={SOURCE_LABEL}
+              onClick={() => onShowChanges(action)}
+              className="flex-1 min-w-0 truncate text-left px-2 py-1.5 text-[11px] text-muted-foreground hover:text-foreground hover:underline underline-offset-2 transition-colors"
+              title={VIEW_CHANGES_LABEL}
             >
-              <IconCode size={14} />
+              <span className="font-semibold text-foreground">v{action.current_version}</span>
+              {' · '}{ORIGIN_LABELS[latest.origin] || latest.origin}{' · '}{relTime(latest.ts)}
+              {latest.summary ? ` — ${latest.summary}` : ''}
             </button>
+          ) : (
+            <span className="flex-1" />
           )}
           <button
             type="button"
@@ -148,7 +207,7 @@ function ActionRow({
       {filesOpen && files.length > 0 && (
         <ul className="border-t bg-muted/20 py-1 px-1">
           {files.map((f, idx) => (
-            <FileItem key={`${f.url}-${idx}`} file={f} onDownload={onDownload} onDelete={onDeleteFile} />
+            <FileItem key={`${f.url}-${idx}`} file={f} fresh={freshFileIds.has(`${f.app_id}/${f.identifier}`)} onDownload={onDownload} onDelete={onDeleteFile} />
           ))}
         </ul>
       )}
@@ -163,20 +222,24 @@ interface ActionsDrawerProps {
 
 export function ActionsDrawer({ open, onClose }: ActionsDrawerProps) {
   const {
-    actions, runAction, deleteAction, showActionCode, deleteAppAttachment,
-    devMode, runningActionId, filesByAction, downloadFile, setChatOpen,
+    actions, runAction, deleteAction, showActionCode, openCodeDrawer, deleteAppAttachment,
+    devMode, runningActionId, filesByAction, freshFileIds, downloadFile, setChatOpen,
+    codeDrawerAction, actionsHighlight,
   } = useActions();
+
+  // Footer version line → drawer, focused on the latest change's diff
+  const showChanges = (a: Action) => openCodeDrawer(a, { version: a.current_version, tab: 'diff' });
 
   const unassigned = filesByAction['__unassigned__'] || [];
   const total = actions.length + (unassigned.length > 0 ? 1 : 0);
 
-  // Esc closes
+  // Esc closes — unless the code drawer is stacked on top (it owns Esc then)
   useEffect(() => {
-    if (!open) return;
+    if (!open || codeDrawerAction) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  }, [open, onClose, codeDrawerAction]);
 
   if (!open) return null;
 
@@ -242,12 +305,15 @@ export function ActionsDrawer({ open, onClose }: ActionsDrawerProps) {
                   key={`${a.app_id}/${a.identifier}`}
                   action={a}
                   files={filesByAction[a.identifier] || []}
+                  freshFileIds={freshFileIds}
                   running={runningActionId === a.identifier}
                   disabled={runningActionId !== null}
                   devMode={devMode}
+                  highlight={actionsHighlight?.appId === a.app_id && actionsHighlight?.identifier === a.identifier}
                   onRun={runAction}
                   onDelete={deleteAction}
                   onShowCode={showActionCode}
+                  onShowChanges={showChanges}
                   onDownload={handleDownload}
                   onDeleteFile={handleDeleteFile}
                 />
@@ -265,7 +331,7 @@ export function ActionsDrawer({ open, onClose }: ActionsDrawerProps) {
                   </div>
                   <ul className="border-t bg-muted/20 py-1 px-1">
                     {unassigned.map((f, idx) => (
-                      <FileItem key={`${f.url}-${idx}`} file={f} onDownload={handleDownload} onDelete={handleDeleteFile} />
+                      <FileItem key={`${f.url}-${idx}`} file={f} fresh={freshFileIds.has(`${f.app_id}/${f.identifier}`)} onDownload={handleDownload} onDelete={handleDeleteFile} />
                     ))}
                   </ul>
                 </div>

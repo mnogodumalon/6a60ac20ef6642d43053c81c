@@ -1,3 +1,0 @@
-- Projekte (projekte): projektname[string/text], beschreibung[string/textarea], vorname[string/text], nachname[string/text], startdatum[date/date], enddatum[date/date], status[lookup/select]
-- Aufgaben (aufgaben): projekt[applookup/select], titel[string/text], aufgabe_beschreibung[string/textarea], prioritaet[lookup/radio], faelligkeitsdatum[date/date], aufgabe_status[lookup/select], zustaendig_vorname[string/text], zustaendig_nachname[string/text]
-  → projekt links to app_id 6a60ac10150ed11a39476862
