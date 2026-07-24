@@ -65,12 +65,47 @@ export async function listPublicPages(): Promise<Record<string, PublicPageSummar
 }
 
 export async function setPublished(slug: string, published: boolean): Promise<PublicPageSummary> {
+  return patchPage(slug, { published });
+}
+
+export async function updateFields(slug: string, fields: string[]): Promise<PublicPageSummary> {
+  return patchPage(slug, { fields });
+}
+
+async function patchPage(slug: string, body: Record<string, unknown>): Promise<PublicPageSummary> {
   const res = await fetch(`${BASE}/${encodeURIComponent(APPGROUP_ID)}/${encodeURIComponent(slug)}`, {
     method: 'PATCH',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ published }),
+    body: JSON.stringify(body),
   });
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json();
+}
+
+export interface FieldCatalogEntry {
+  key: string;
+  label: string;
+  fulltype: string;
+  required: boolean;
+  selectable: boolean;
+  selected: boolean;
+  locked: boolean;
+  exposes_list: boolean;
+  reason?: string;
+}
+
+export interface FieldCatalog {
+  editable: boolean;
+  available: FieldCatalogEntry[];
+  selected: string[];
+}
+
+export async function getFields(slug: string): Promise<FieldCatalog> {
+  const res = await fetch(
+    `${BASE}/${encodeURIComponent(APPGROUP_ID)}/${encodeURIComponent(slug)}/fields`,
+    { credentials: 'include', headers: { Accept: 'application/json' } },
+  );
   if (!res.ok) throw new Error(await readError(res));
   return res.json();
 }

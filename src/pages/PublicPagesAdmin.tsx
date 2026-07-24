@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   IconWorld, IconCheck, IconLink, IconExternalLink, IconLoader2, IconAlertTriangle,
+  IconAdjustments, IconEye,
 } from '@tabler/icons-react';
 import { PageShell } from '@/components/PageShell';
 import { Button } from '@/components/ui/button';
@@ -8,8 +9,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import {
-  listPublicPages, setPublished,
-  type PublicPageSummary,
+  listPublicPages, setPublished, getFields, updateFields,
+  type PublicPageSummary, type FieldCatalogEntry,
 } from '@/lib/publicPagesAdmin';
 
 // Owner-facing management of the dashboard's public pages. Same-origin fetch
@@ -38,6 +39,13 @@ const T = {
   cannot_line: 'bestehende Daten sehen oder ändern.',
   cancel: 'Abbrechen',
   confirm_publish: 'Veröffentlichen',
+  fields: 'Felder',
+  fields_title: 'Felder auswählen',
+  fields_intro: 'Wähle, welche Felder im öffentlichen Formular erscheinen.',
+  field_required: 'Pflichtfeld — immer enthalten',
+  field_file: 'Datei-Upload wird öffentlich nicht unterstützt',
+  field_exposes: 'Zeigt Besuchern die Liste der verknüpften Einträge',
+  save: 'Speichern',
 };
 
 function originLabel(o: string): string {
@@ -66,6 +74,13 @@ export default function PublicPagesAdmin() {
   const [busySlug, setBusySlug] = useState<string | null>(null);
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
   const [confirmSlug, setConfirmSlug] = useState<string | null>(null);
+  // Field editor: which page's fields we're editing, the catalog, and the
+  // working selection (a Set of chosen keys).
+  const [fieldsSlug, setFieldsSlug] = useState<string | null>(null);
+  const [catalog, setCatalog] = useState<FieldCatalogEntry[]>([]);
+  const [chosen, setChosen] = useState<Set<string>>(new Set());
+  const [fieldsLoading, setFieldsLoading] = useState(false);
+  const [savingFields, setSavingFields] = useState(false);
 
   const load = async () => {
     try {
@@ -101,6 +116,47 @@ export default function PublicPagesAdmin() {
       setTimeout(() => setCopiedSlug(c => (c === page.slug ? null : c)), 1500);
     } catch {
       // clipboard unavailable — the open link still works
+    }
+  };
+
+  const openFields = async (slug: string) => {
+    setFieldsSlug(slug);
+    setFieldsLoading(true);
+    try {
+      const cat = await getFields(slug);
+      setCatalog(cat.available);
+      setChosen(new Set(cat.selected));
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setFieldsSlug(null);
+    } finally {
+      setFieldsLoading(false);
+    }
+  };
+
+  const toggleField = (entry: FieldCatalogEntry) => {
+    if (!entry.selectable || entry.locked) return;
+    setChosen(prev => {
+      const next = new Set(prev);
+      if (next.has(entry.key)) next.delete(entry.key);
+      else next.add(entry.key);
+      return next;
+    });
+  };
+
+  const saveFields = async () => {
+    if (!fieldsSlug) return;
+    setSavingFields(true);
+    try {
+      const updated = await updateFields(fieldsSlug, Array.from(chosen));
+      setPages(prev => ({ ...prev, [fieldsSlug]: updated }));
+      setError(null);
+      setFieldsSlug(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSavingFields(false);
     }
   };
 
@@ -166,6 +222,18 @@ export default function PublicPagesAdmin() {
                 </div>
               ) : null}
 
+              {page.type !== 'custom' ? (
+                <button
+                  type="button"
+                  title={T.fields}
+                  aria-label={T.fields}
+                  onClick={() => openFields(page.slug)}
+                  className="shrink-0 p-2 rounded-xl text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                >
+                  <IconAdjustments size={18} stroke={1.5} />
+                </button>
+              ) : null}
+
               <Button
                 variant={page.published ? 'outline' : 'default'}
                 size="sm"
@@ -207,6 +275,61 @@ export default function PublicPagesAdmin() {
             <Button variant="outline" onClick={() => setConfirmSlug(null)}>{T.cancel}</Button>
             <Button onClick={() => confirmPage && applyPublished(confirmPage.slug, true)}>
               {T.confirm_publish}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!fieldsSlug} onOpenChange={v => !v && setFieldsSlug(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{T.fields_title}</DialogTitle>
+            <DialogDescription>{T.fields_intro}</DialogDescription>
+          </DialogHeader>
+          {fieldsLoading ? (
+            <div className="flex justify-center py-8">
+              <IconLoader2 size={24} stroke={1.5} className="animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="max-h-[50vh] overflow-y-auto space-y-1 -mx-2 px-2">
+              {catalog.map(entry => {
+                const checked = entry.locked ? true : chosen.has(entry.key);
+                const disabled = !entry.selectable || entry.locked;
+                return (
+                  <label
+                    key={entry.key}
+                    className={`flex items-start gap-3 rounded-xl px-3 py-2 ${
+                      disabled ? 'opacity-60' : 'cursor-pointer hover:bg-accent'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="mt-1 h-4 w-4 shrink-0"
+                      checked={checked}
+                      disabled={disabled}
+                      onChange={() => toggleField(entry)}
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-sm">{entry.label}</span>
+                      {entry.locked ? (
+                        <span className="block text-xs text-muted-foreground">{T.field_required}</span>
+                      ) : entry.reason === 'file' ? (
+                        <span className="block text-xs text-muted-foreground">{T.field_file}</span>
+                      ) : entry.exposes_list ? (
+                        <span className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-500">
+                          <IconEye size={13} stroke={1.5} /> {T.field_exposes}
+                        </span>
+                      ) : null}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFieldsSlug(null)}>{T.cancel}</Button>
+            <Button onClick={saveFields} disabled={savingFields || fieldsLoading}>
+              {savingFields ? <IconLoader2 size={16} stroke={1.5} className="animate-spin" /> : T.save}
             </Button>
           </DialogFooter>
         </DialogContent>

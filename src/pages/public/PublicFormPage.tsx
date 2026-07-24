@@ -13,6 +13,7 @@ import {
   loadPublicPagesConfig,
   prepareChallenge,
   createPublicRecord,
+  listPublicRecords,
   PageUnavailableError,
   RateLimitedError,
   FieldValidationError,
@@ -40,15 +41,60 @@ function isEmpty(value: unknown): boolean {
   return false;
 }
 
+interface RefOption {
+  value: string; // suffix "/apps/{app}/records/{id}" — the wire value
+  label: string;
+}
+
 interface FieldInputProps {
   field: PublicFieldConfig;
   value: unknown;
   onChange: (value: unknown) => void;
+  refOptions?: RefOption[];
+  refLoading?: boolean;
 }
 
-function FieldInput({ field, value, onChange }: FieldInputProps) {
+function FieldInput({ field, value, onChange, refOptions, refLoading }: FieldInputProps) {
   const ft = field.fulltype;
   const options = field.options ?? [];
+
+  if (ft.includes('applookup')) {
+    if (refLoading) {
+      return <IconLoader2 size={18} stroke={1.5} className="animate-spin text-muted-foreground" />;
+    }
+    const opts = refOptions ?? [];
+    if (field.multiple) {
+      const current = Array.isArray(value) ? (value as string[]) : [];
+      return (
+        <div className="space-y-2">
+          {opts.map(opt => (
+            <div key={opt.value} className="flex items-center gap-2">
+              <Checkbox
+                id={`${field.key}_${opt.value}`}
+                checked={current.includes(opt.value)}
+                onCheckedChange={checked => {
+                  const next = checked ? [...current, opt.value] : current.filter(v => v !== opt.value);
+                  onChange(next.length ? next : undefined);
+                }}
+              />
+              <Label htmlFor={`${field.key}_${opt.value}`} className="font-normal">{opt.label}</Label>
+            </div>
+          ))}
+        </div>
+      );
+    }
+    return (
+      <Select value={(value as string) ?? ''} onValueChange={v => onChange(v === 'none' ? undefined : v)}>
+        <SelectTrigger id={field.key} className="max-sm:h-11"><SelectValue placeholder="" /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="none">—</SelectItem>
+          {opts.map(opt => (
+            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    );
+  }
 
   if (ft === 'string/textarea') {
     return (
@@ -210,6 +256,10 @@ export default function PublicFormPage() {
   const [values, setValues] = useState<FieldValues>({});
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
+  // applookup options fetched at runtime, keyed by field key. Value is the
+  // wire suffix "/apps/{targetApp}/records/{id}" the create endpoint expects.
+  const [refOptions, setRefOptions] = useState<Record<string, RefOption[]>>({});
+  const [refLoading, setRefLoading] = useState(false);
   const preparedRef = useRef(false);
 
   useEffect(() => {
@@ -225,6 +275,30 @@ export default function PublicFormPage() {
       setConfig(cfg);
       setPage(pg);
       setStatus('ready');
+
+      // Load option lists for applookup fields from their target apps
+      // (chained read grant). Best-effort: a field whose list fails just
+      // renders empty.
+      const refFields = pg.fields.filter(f => f.fulltype.includes('applookup') && f.target_app_id);
+      if (refFields.length > 0) {
+        setRefLoading(true);
+        const loaded: Record<string, RefOption[]> = {};
+        for (const f of refFields) {
+          try {
+            const records = await listPublicRecords(cfg, pg, { appId: f.target_app_id!, limit: 500 });
+            loaded[f.key] = Object.entries(records).map(([id, rec]) => ({
+              value: `/apps/${f.target_app_id}/records/${id}`,
+              label: String((f.display_field && rec.fields[f.display_field]) ?? id),
+            }));
+          } catch {
+            loaded[f.key] = [];
+          }
+        }
+        if (!cancelled) {
+          setRefOptions(loaded);
+          setRefLoading(false);
+        }
+      }
     })();
     return () => {
       cancelled = true;
@@ -359,7 +433,13 @@ export default function PublicFormPage() {
                 {field.required ? ' *' : ''}
               </Label>
             ) : null}
-            <FieldInput field={field} value={values[field.key]} onChange={v => setField(field.key, v)} />
+            <FieldInput
+              field={field}
+              value={values[field.key]}
+              onChange={v => setField(field.key, v)}
+              refOptions={refOptions[field.key]}
+              refLoading={refLoading && field.fulltype.includes('applookup')}
+            />
             {fieldErrors[field.key] ? (
               <p className="text-sm text-destructive" role="alert">{fieldErrors[field.key]}</p>
             ) : null}

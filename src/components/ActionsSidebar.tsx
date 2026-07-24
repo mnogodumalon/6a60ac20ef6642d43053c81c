@@ -16,14 +16,13 @@ const LABEL = 'Werkzeuge';
  * zurücksetzt.
  */
 export function ActionsSidebar() {
-  const { actions, filesByAction, actionsDrawerOpen, openActionsDrawer, closeActionsDrawer } = useActions();
+  const { actionsDrawerOpen, openActionsDrawer, closeActionsDrawer } = useActions();
   const navRef = useRef<HTMLElement>(null);
 
-  const unassignedCount = filesByAction['__unassigned__']?.length ?? 0;
-  const total = actions.length + (unassignedCount > 0 ? 1 : 0);
   // Immer sichtbar — eine leere Liste zeigt den Empty-State des Drawers mit
   // der Im-Chat-erstellen-CTA statt den Einstiegspunkt ganz zu verstecken.
-  const itemsJson = JSON.stringify([{ title: total > 0 ? `${LABEL} (${total})` : LABEL }]);
+  // Ohne Zähler: schlichter Eintrag im Figma-Muster der Aktionen-Sektion.
+  const itemsJson = JSON.stringify([{ title: LABEL }]);
 
   useEffect(() => {
     const el = navRef.current;

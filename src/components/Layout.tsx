@@ -1,11 +1,12 @@
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { IconAlertCircle, IconFlask } from '@tabler/icons-react';
+import { IconAlertCircle } from '@tabler/icons-react';
 import { useState, useEffect, useRef } from 'react';
 import ChatWidget from '@/components/ChatWidget';
 import { ActionCodeDrawer } from '@/components/ActionCodeDrawer';
 import { ActionInputDialog } from '@/components/ActionInputDialog';
 import { ActionsSidebar } from '@/components/ActionsSidebar';
 import { IntentsNav } from '@/components/IntentsNav';
+import { PublicPagesNav } from '@/components/PublicPagesNav';
 import { useActions } from '@/context/ActionsContext';
 import { Button } from '@/components/ui/button';
 import { VersionCheck } from '@/components/VersionCheck';
@@ -24,7 +25,7 @@ document.documentElement.lang = 'de';
 export function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { devMode, setDevMode, betaMode, setBetaMode, inputFormAction, inputFormOptions, submitActionInputs, cancelInputForm } = useActions();
+  const { inputFormAction, inputFormOptions, submitActionInputs, cancelInputForm } = useActions();
   const [authError, setAuthError] = useState(false);
   const drawerRef = useRef<HTMLElement>(null);
   const dashboardLinkRef = useRef<HTMLElement>(null);
@@ -131,47 +132,33 @@ export function Layout() {
               der Gruppe (la-app-group-nav-widget → /gateway-Listenseiten). */}
           <la-nav-section type="secondary" label="Darstellung">
             <la-dashboard-link-widget ref={dashboardLinkRef} app-id={APP_ID} />
-            <la-nav-section type="primary" label="Datenverwaltung" icon="IconMenu2">
+            {/* dense = kleinere Unterpunkt-Schrift (setzt --la-nav-text-size
+                im Sektions-Shadow) — exakt wie die Datenverwaltung im Gateway. */}
+            <la-nav-section type="primary" label="Datenverwaltung" icon="IconMenu2" dense="">
               <la-app-group-nav-widget group-id={APPGROUP_ID} />
             </la-nav-section>
           </la-nav-section>
 
-          <IntentsNav />
-
-          <ActionsSidebar />
-
-          {/* Bewusst NICHT im footer-Slot: sticky fraß er mobile Höhe, sodass
-              Abläufe/Werkzeuge erst nach Scrollen sichtbar wurden. Als letztes
-              Kind im Default-Slot scrollt der Block mit dem Inhalt. */}
-          <div className="py-4 space-y-3">
-            <a
-              href="/claude/static/lab.html"
-              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <IconFlask size={16} className="shrink-0" />
-              <span>Klar Lab</span>
-            </a>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={devMode}
-                onChange={e => setDevMode(e.target.checked)}
-                className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
-              />
-              <span className="text-sm text-foreground">Entwickler</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={betaMode}
-                onChange={e => setBetaMode(e.target.checked)}
-                className="w-4 h-4 rounded border-border text-primary focus:ring-primary"
-              />
-              <span className="text-sm text-foreground">Beta Features</span>
-            </label>
-            <div className="border-t border-sidebar-border pt-3">
+          {/* Aktionen-Sektion (Figma-Muster): alles, was man TUN kann —
+              Abläufe und Öffentliche Seiten als aufklappbare Gruppen
+              (starten zu), Werkzeuge als schlichter Eintrag (öffnet den
+              ActionsDrawer), dann die Version als Meta-Zeile. Klar Lab und
+              die Entwickler/Beta-Toggles stecken im Versions-Panel. */}
+          <la-nav-section type="secondary" label="Aktionen">
+            <IntentsNav />
+            <ActionsSidebar />
+            <PublicPagesNav />
+            <div className="pt-2">
               <VersionCheck />
             </div>
+          </la-nav-section>
+
+          {/* Sticky Footer = dünne Meta-Zeile (Figma-Muster). Relative
+              Pfade, damit die Plattform-Seiten auf jedem Host stimmen. */}
+          <div slot="footer" className="flex flex-wrap gap-x-4 gap-y-1 border-t border-sidebar-border py-3 text-sm font-medium text-muted-foreground">
+            <a href="/impressum.htm" className="hover:text-foreground transition-colors">Impressum</a>
+            <a href="/datenschutz.htm" className="hover:text-foreground transition-colors">Datenschutz</a>
+            <a href="/apps.htm" className="hover:text-foreground transition-colors">LivingApps</a>
           </div>
         </la-drawer>
       )}

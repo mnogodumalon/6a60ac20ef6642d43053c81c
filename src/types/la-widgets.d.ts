@@ -48,6 +48,8 @@ declare namespace React {
         type?: 'primary' | 'secondary';
         label?: string;
         icon?: string;
+        /** Kleinere Unterpunkt-Schrift: setzt --la-nav-text-size im Shadow. */
+        dense?: string;
         foldable?: string;
         divider?: string;
         scroll?: boolean;

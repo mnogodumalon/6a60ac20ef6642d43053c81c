@@ -32,6 +32,11 @@ export interface PublicFieldConfig {
   required: boolean;
   /** Present for lookup/multiplelookup fields. */
   options?: PublicFieldOption[];
+  /** applookup fields: options are fetched at runtime from the target app. */
+  multiple?: boolean;
+  target_app_id?: string;
+  target_entity?: string;
+  display_field?: string;
 }
 
 /** One data operation of a custom (agent-built) page. */
