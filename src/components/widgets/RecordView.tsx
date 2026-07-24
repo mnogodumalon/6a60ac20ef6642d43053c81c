@@ -306,8 +306,7 @@ export function RecordSection({ title, icon: Icon, cols = 1, className, children
 }
 
 // Exported as the SINGLE source of truth for the shared 9-value format
-// vocabulary — TableWidget imports this type and extends it (TableCellFormat).
-// Keep these literals in sync only HERE.
+// vocabulary of the widget family. Keep these literals in sync only HERE.
 export type RecordFieldFormat = 'text' | 'longtext' | 'date' | 'datetime' | 'currency' | 'bool' | 'email' | 'url' | 'pill';
 
 type RecordFieldProps = {

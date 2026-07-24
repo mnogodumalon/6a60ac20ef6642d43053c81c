@@ -3,8 +3,7 @@
  *
  * Ordnet die MENGEN-Achse: Verteilung pro Kategorie, Verlauf über Zeit, Anteil
  * am Ganzen. Die Karte, die eine Zahl AUFBRICHT — zwischen KPI-Punktwert
- * (StatCard/StatStrip) und exakter Tabelle (TableWidget). Compose; never
- * reimplement.
+ * (StatCard/StatStrip) und exakter Tabelle. Compose; never reimplement.
  *
  * @version 1.1.1
  * @since 2026-07-07  (1.1.1: adversarial-round fixes — the selection is ONE
@@ -71,14 +70,13 @@
  *     "Filter entfällt ✕" (sel.test now matches nothing — sibling is empty).
  *     The widget NEVER calls onSelect for you; the chip click is the reset.
  *  2. Never edit this file (nor ./primitives.ts); never import from a sister
- *     widget (the TableCellFormat TYPE import is the sanctioned exception).
- *     Gaps → `footer` (text only) + // TODO(widget-gap). Never fork.
+ *     widget. Gaps → `footer` (text only) + // TODO(widget-gap). Never fork.
  *  3. Data-agnostic: accessors read the typed row; every key is OPAQUE. The
  *     widget aggregates ITSELF — NEVER pass precomputed chart points.
  *  4. Raw-value contract: aggregation reads accessors, never formatted strings.
  *     `format` decides rendering only (head sum, list values, ticks, focus
  *     label). 'currency' renders via the shared family formatter
- *     (formatCurrency), like TableWidget.
+ *     (formatCurrency), like the widget family.
  *  5. NOTHING disappears silently: null/'' category → "Ohne Angabe" row;
  *     non-finite measure and unparseable time strings → "n ohne Wert" notice;
  *     "Andere (N)" always visible and last; capped categories → "7 von N"
@@ -131,7 +129,6 @@ import { addDays, addMonths, addWeeks, differenceInCalendarDays, differenceInCal
 import { de as dfnsDe } from 'date-fns/locale';
 import { formatCurrency } from '@/lib/formatters';
 import { TONE_TEXT, labelOf, type WidgetTone } from './primitives';
-import type { TableCellFormat } from './TableWidget';
 
 // Closed tone enum — const array export (family KANBAN_TONES pattern).
 export const CHART_TONES = ['default', 'primary', 'success', 'warning', 'destructive'] as const;
@@ -141,15 +138,15 @@ export type ChartTone = (typeof CHART_TONES)[number];
 const _toneParity: Record<ChartTone, WidgetTone> = { default: 'default', primary: 'primary', success: 'success', warning: 'warning', destructive: 'destructive' };
 void _toneParity;
 
-/** Getypte Records — Familien-Konvention, identisch Table/Kanban/Map.
+/** Getypte Records — Familien-Konvention, identisch Kanban/Map.
  *  id = `entity:${record_id}` (die einzige ID-Quelle). */
 export interface ChartRow<T> { id: string; data: T }
 
-/** Geteiltes Format-Vokabular — per Extract TYP-GEBUNDEN ans Familien-Enum,
- *  keine Kopie: benennt TableWidget ein Literal um, bricht dieser Build.
- *  'percent' ist chart-lokal (Anteil ist eine Aggregat-Eigenschaft, kein
- *  Record-Feld — es gehört bewusst nicht ins Record-Vokabular). */
-export type ChartValueFormat = Extract<TableCellFormat, 'number' | 'currency'> | 'percent';
+/** Format-Vokabular des Charts. 'number'/'currency' sind die Literale des
+ *  Familien-Vokabulars (RecordFieldFormat-Erweiterung); 'percent' ist
+ *  chart-lokal (Anteil ist eine Aggregat-Eigenschaft, kein Record-Feld —
+ *  es gehört bewusst nicht ins Record-Vokabular). */
+export type ChartValueFormat = 'number' | 'currency' | 'percent';
 
 /** Sprach-Texte des Widgets (Familien-Muster: eingebaute UI-Map + locale). */
 export interface ChartTexts {
@@ -170,7 +167,7 @@ export interface ChartTexts {
  *  Prinzip): Skala, Sortierung, Lücken-Behandlung leitet das WIDGET ab. Die
  *  Mark folgt der Dimension — category→BarList, time→Linie; ein Zeit-Donut
  *  oder ein „falscher Chart-Typ" ist per Typsystem unbaubar.
- *  SIGNATUR: accessor nimmt (row: ChartRow<T>) — EXAKT wie TableWidget. */
+ *  SIGNATUR: accessor nimmt (row: ChartRow<T>) — die Familien-Signatur. */
 export type ChartDimension<T> =
   | { kind: 'category';
       accessor: (row: ChartRow<T>) => unknown;

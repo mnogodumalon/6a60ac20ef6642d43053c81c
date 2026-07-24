@@ -120,9 +120,9 @@ export type OnMapPointClick = (point: { lat: number; long: number }) => void;
  *  Rule logic and message text live in the CONSUMER; the widget only displays. */
 export type WriteResult = void | string | Promise<void | string>;
 
-// ── raw-value normalization (lifted verbatim from TableWidget 1.0) ───────
-// The ONE scalar behind a Living-Apps raw value. TableWidget sorts/searches on
-// it, ChartWidget aggregates on it — one normalizer, one truth. Total and
+// ── raw-value normalization ──────────────────────────────────────────────
+// The ONE scalar behind a Living-Apps raw value. ChartWidget aggregation (and
+// every family consumer) reads it — one normalizer, one truth. Total and
 // defensive: never throws, never yields "[object Object]".
 
 export function labelOf(v: unknown): string {

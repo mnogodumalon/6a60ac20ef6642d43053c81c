@@ -136,7 +136,7 @@ if (gridIdx >= 0) {
 // card (+ glued <h2>) inside `primary` is double chrome and makes the same
 // widget look different across dashboards.
 {
-  const widgetTag = /<(TableWidget|CalendarWidget|KanbanWidget|ResourceTimeline|MapWidget)\b/;
+  const widgetTag = /<(CalendarWidget|KanbanWidget|ResourceTimeline|MapWidget)\b/;
   let from = 0;
   while (true) {
     const p = src.indexOf('primary={', from);
@@ -148,12 +148,6 @@ if (gridIdx >= 0) {
     }
     from = p + 9;
   }
-}
-
-// 15. pagination is a reliability DEFAULT (auto above 10 rows) — tune it only
-// on explicit user request, or every dashboard paginates differently.
-if (/pagination\s*=\s*\{\{/.test(src)) {
-  warnings.push('pagination={{ pageSize }} set — the automatic default (10) is the product standard; set a custom pageSize ONLY when the user explicitly asked for it.');
 }
 
 // 16. One-axis heuristic for charts: the SAME record field driving a clickable
