@@ -1,0 +1,16 @@
+{
+  "entities": {
+    "Projekte": {
+      "placeholders_set": 6,
+      "defaults_keys": ["startdatum", "enddatum", "status"],
+      "computed_keys": [],
+      "reason": "Reine Stammdaten (Name, Beschreibung, Personenangaben). Keine Mengen, Preise oder bewerbaren Berechnungen. Das Datumspaar startdatum/enddatum ist strukturell vorhanden, aber es gibt kein zugehöriges Anzahl-Feld (nächte/tage), das eine Dauer bräuchte—in diesem Kontext ist 'Enddatum' ein reines Terminfeld ohne Berechnung des Projektumfangs."
+    },
+    "Aufgaben": {
+      "placeholders_set": 6,
+      "defaults_keys": ["faelligkeitsdatum", "prioritaet", "aufgabe_status"],
+      "computed_keys": [],
+      "reason": "Reine Stammdaten (Titel, Beschreibung, Zuordnung, Status). Das applookup-Feld 'projekt' hat kein Zielfeld mit Preis/Satz/Kosten. Ein einzelnes Fälligkeitsdatum ohne Anfangsdatum oder Dauer-Feld. Keine Mengen oder Beträge, daher kein Raum für Berechnung."
+    }
+  }
+}

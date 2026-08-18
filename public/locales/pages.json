@@ -1,0 +1,42 @@
+{
+  "pages": {
+    "en": {
+      "Alle Aufgaben erledigt — super gemacht!": "All tasks done — great job!",
+      "Alle offenen Aufgaben": "All Open Tasks",
+      "Als erledigt markieren": "Mark as Done",
+      "Aufgabe als „{0}\" markiert": "Task marked as \"{0}\"",
+      "Aufgabe anlegen": "Create Task",
+      "Erledigt": "Done",
+      "Erstes Projekt anlegen": "Create First Project",
+      "Hoch": "High",
+      "Hochprioritäre Aufgaben": "High-Priority Tasks",
+      "In Bearbeitung": "In Progress",
+      "In Bearbeitung setzen": "Set In Progress",
+      "Keine hochprioritären Aufgaben — alles auf Kurs!": "No high-priority tasks — everything on track!",
+      "Lege dein erstes Projekt an.": "Create your first project.",
+      "Mittel": "Medium",
+      "Neue Aufgabe": "New Task",
+      "Niedrig": "Low",
+      "Noch kein Projekt angelegt": "No project created yet",
+      "Noch keine aktiven Projekte — starte eines!": "No active projects yet — start one!",
+      "Offen": "Open",
+      "Offene Aufgaben": "Open Tasks",
+      "Ohne Name": "Unnamed",
+      "Ohne Titel": "Untitled",
+      "Projekt abschließen": "Complete Project",
+      "Projekt auf „{0}\" gesetzt": "Project set to \"{0}\"",
+      "Projekt nach „{0}\" verschoben": "Project moved to \"{0}\"",
+      "Projekt starten": "Start Project",
+      "Starte dein erstes Projekt und behalte den Überblick.": "Start your first project and stay on top of things.",
+      "Starten": "Start",
+      "fällig war": "was due",
+      "ist überfällig": "is overdue",
+      "laufen gerade": "currently running",
+      "läuft gerade": "currently running",
+      "sind überfällig": "are overdue",
+      "Öffnen": "Open",
+      "Überfällig": "Overdue"
+    }
+  },
+  "v": 1
+}
