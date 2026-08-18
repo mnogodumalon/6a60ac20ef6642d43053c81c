@@ -20,6 +20,7 @@
 import type { ComponentType } from 'react';
 
 // <custom:intent-imports>
+import { IconFolderPlus, IconCircleCheck } from '@tabler/icons-react';
 // </custom:intent-imports>
 
 export interface IntentLink {
@@ -42,6 +43,8 @@ export interface IntentLink {
 
 export const INTENTS: IntentLink[] = [
   // <custom:intents>
+  { path: '/intents/projekt-starten', label: { de: 'Projekt starten', en: 'Start project' }, icon: IconFolderPlus, description: 'Neues Projekt anlegen und erste Aufgaben hinzufügen' },
+  { path: '/intents/aufgabe-erledigen', label: { de: 'Aufgabe erledigen', en: 'Complete task' }, icon: IconCircleCheck, description: 'Offene Aufgabe suchen und Status vorrücken' },
   // </custom:intents>
 ];
 
@@ -52,4 +55,4 @@ export const INTENTS: IntentLink[] = [
  * purpose — a scaffold update resets it to false (self-healing if Phase 2
  * never ran).
  */
-export const INTENTS_PENDING = true;
+export const INTENTS_PENDING = false;
