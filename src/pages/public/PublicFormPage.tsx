@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
-import { IconCircleCheck, IconLoader2 } from '@tabler/icons-react';
+import { IconCircleCheck, IconEye, IconLoader2 } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -14,6 +14,7 @@ import { AddressAutocomplete } from '@/components/AddressAutocomplete';
 import { t, fieldLabelByAppId, lookupLabelByAppId } from '@/i18n';
 import {
   loadPublicPagesConfig,
+  isPreviewMode,
   prepareChallenge,
   createPublicRecord,
   listPublicRecords,
@@ -381,9 +382,16 @@ export default function PublicFormPage() {
     preparedRef.current = false;
   };
 
+  // Same chrome as PublicShell (bespoke pages) — keep the two in sync.
   const shell = (children: ReactNode) => (
     <div className="min-h-screen bg-background flex flex-col">
-      <main className="flex-1 w-full max-w-lg mx-auto px-4 py-8 sm:py-12">{children}</main>
+      {isPreviewMode() ? (
+        <div className="sticky top-0 z-50 flex items-center justify-center gap-2 bg-amber-500 px-4 py-1.5 text-center text-xs font-medium text-white">
+          <IconEye size={14} stroke={1.5} className="shrink-0" />
+          <span>{t('ps_preview_banner')}</span>
+        </div>
+      ) : null}
+      <main className="flex-1 w-full max-w-[640px] mx-auto px-4 py-8 sm:py-12">{children}</main>
       <footer className="py-4 text-center text-xs text-muted-foreground">
         {t('pf_powered_by_text')}
       </footer>
@@ -409,23 +417,28 @@ export default function PublicFormPage() {
 
   if (status === 'done') {
     return shell(
-      <div className="rounded-[27px] bg-card shadow-lg p-6 sm:p-8 text-center">
-        <IconCircleCheck size={44} stroke={1.5} className="mx-auto mb-3 text-primary" />
-        <h1 className="text-xl font-medium mb-2">{page.thank_you_title}</h1>
-        <p className="text-muted-foreground mb-6">{page.thank_you_message}</p>
-        <Button variant="outline" onClick={resetForAnotherEntry}>{t('pf_another_entry_text')}</Button>
+      <div className="rounded-[27px] bg-card shadow-lg overflow-hidden">
+        <div className="h-2 bg-primary" aria-hidden="true" />
+        <div className="p-6 sm:p-8 text-center">
+          <IconCircleCheck size={44} stroke={1.5} className="mx-auto mb-3 text-primary" />
+          <h1 className="text-xl font-medium mb-2">{page.thank_you_title}</h1>
+          <p className="text-muted-foreground mb-6">{page.thank_you_message}</p>
+          <Button variant="outline" onClick={resetForAnotherEntry}>{t('pf_another_entry_text')}</Button>
+        </div>
       </div>,
     );
   }
 
   return shell(
-    <>
-      <header className="mb-6">
-        <h1 className="text-2xl font-normal">{page.title}</h1>
+    <div className="rounded-[27px] bg-card shadow-lg overflow-hidden">
+      <div className="h-2 bg-primary" aria-hidden="true" />
+      <div className="p-6 sm:p-8">
+      <header className="mb-6 pb-5 border-b border-border">
+        <h1 className="text-2xl font-semibold">{page.title}</h1>
         {page.description ? <p className="text-base text-muted-foreground mt-1">{page.description}</p> : null}
       </header>
       <form
-        className="rounded-[27px] bg-card shadow-lg p-6 sm:p-8 space-y-5"
+        className="space-y-5"
         onSubmit={handleSubmit}
         noValidate
       >
@@ -464,6 +477,7 @@ export default function PublicFormPage() {
           )}
         </Button>
       </form>
-    </>,
+      </div>
+    </div>,
   );
 }

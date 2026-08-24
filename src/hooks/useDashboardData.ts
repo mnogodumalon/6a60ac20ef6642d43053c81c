@@ -52,8 +52,12 @@ export function useDashboardData() {
       }
     }
     function handleRefresh() { void silentRefresh(); }
-    window.addEventListener('dashboard-refresh', handleRefresh);
-    return () => window.removeEventListener('dashboard-refresh', handleRefresh);
+    // assistant:data-changed comes from the assistant (<la-klar-assistant>)
+    // after every mutation. The element additionally fires the legacy
+    // dashboard-refresh event for OLD deployed bundles — do NOT subscribe to
+    // both here, or every mutation fetches twice.
+    window.addEventListener('assistant:data-changed', handleRefresh);
+    return () => window.removeEventListener('assistant:data-changed', handleRefresh);
   }, []);
 
   const projekteMap = useMemo(() => {

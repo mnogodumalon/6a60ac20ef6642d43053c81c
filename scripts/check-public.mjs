@@ -77,6 +77,34 @@ for (const file of pageFiles) {
     const line = src.slice(0, anchor.index).split('\n').length;
     errors.push(`${file}:${line}: in-page anchor href — the app is hash-routed, so this REPLACES the route and navigates the visitor off the page; scroll with a button + ref.scrollIntoView({ behavior: 'smooth' }) instead`);
   }
+  // Root-relative hrefs are broken by design as well: the SPA is deployed
+  // under /objects/<id>/, so href="/#/public/x" resolves against the SITE
+  // root and dumps the visitor on the platform, not the dashboard. This is
+  // the historic evasion of the anchor rule above — forbidden href="#…",
+  // a live lane wrote href="/#/…", which passed the gate and broke worse.
+  const ROOT_HREF_RE = /href\s*=\s*[{]?\s*["'`]\//g;
+  let rootHref;
+  while ((rootHref = ROOT_HREF_RE.exec(src)) !== null) {
+    const line = src.slice(0, rootHref.index).split('\n').length;
+    errors.push(`${file}:${line}: root-relative href — the app is deployed under a sub-path, so "/…" resolves against the site root and throws the visitor off the dashboard; navigate page-to-page with react-router's <Link to="/public/<slug>">, and use a full https:// URL for external targets`);
+  }
+  // Router targets outside /public bounce an anonymous visitor into the
+  // authenticated shell. A public page may only navigate to public pages.
+  const INTERNAL_NAV_RE = /(?:to\s*=\s*[{]?\s*|navigate\(\s*)["'`]\/(?!public\b)/g;
+  let internalNav;
+  while ((internalNav = INTERNAL_NAV_RE.exec(src)) !== null) {
+    const line = src.slice(0, internalNav.index).split('\n').length;
+    errors.push(`${file}:${line}: navigation target outside /public — an anonymous visitor has no session there and gets bounced; public pages may only link to other public pages (<Link to="/public/<slug>">)`);
+  }
+  // The hosted-page look is standardized by the shell's card. A wizard fits
+  // inside it (the stepper is compact) — opting out with `plain` made two
+  // live dashboards on the SAME scaffold version look like different
+  // products, so the combination is rejected outright.
+  const plainWizard = src.includes('IntentWizardShell')
+    && /<PublicShell\b[^>]*\bplain\b/.test(src);
+  if (plainWizard) {
+    errors.push(`${file}: PublicShell \`plain\` combined with IntentWizardShell — wizards render INSIDE the shell's card (drop \`plain\`); the standardized hosted look must be identical across pages`);
+  }
   let m;
   while ((m = IMPORT_RE.exec(src)) !== null) {
     const spec = m[1];
@@ -186,6 +214,18 @@ for (const [slug, page] of surfacePages) {
     }
   }
   for (const ep of page.endpoints || []) {
+    // A public page can READ and CREATE — nothing else. There is no update,
+    // no delete: a grant that lets an anonymous visitor MODIFY an existing
+    // record is not something the platform hands out. A live build declared
+    // `op: 'update'` (to append a member to a meeting's participant list),
+    // hand-rolled its own PATCH, passed every gate, and was thrown away by
+    // the ingest AFTER the deploy — 304 lane-seconds for nothing, and the
+    // dashboard was left without any public page at all.
+    // "Register for an existing X" is therefore a CREATE in a registration
+    // entity, never an edit of X.
+    if (!['list', 'create'].includes(ep.op)) {
+      errors.push(`${SURFACE}: page '${slug}' endpoint '${ep.entity}' declares op '${ep.op}' — only 'list' (read) and 'create' (anonymous submit) exist. An anonymous visitor can never MODIFY an existing record: model the action as a create in a registration entity. If this page cannot be built that way, write _public/<slug>.blocked.json instead (see the public-builder skill) — never invent an op.`);
+    }
     if (ep.scope && !ep.scope_description) {
       errors.push(`${SURFACE}: page '${slug}' endpoint '${ep.entity}' has a scope but no scope_description — the owner confirms that text when publishing, never the vSQL`);
     }

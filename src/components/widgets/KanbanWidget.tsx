@@ -92,8 +92,12 @@
  *     columns               KanbanColumn[]  — ordered columns { key, label: string, tone? }; lowercase `columns`.
  *                                             `label` is a plain STRING (schema lookup label) — reusable in toasts,
  *                                             aria texts and LookupValue writes; rich headers via renderColumnHeader.
- *                                             Build them from the schema's lookup values:
+ *                                             Build them from the schema's lookup values, INSIDE the
+ *                                             component body — never as a module-scope const:
  *                                             (LOOKUP_OPTIONS['<app>']?.['<statusfeld>'] ?? []).map(o => ({ key: o.key, label: o.label }))
+ *                                             `o.label` is a locale-aware GETTER; hoisted to module
+ *                                             scope it evaluates once at import and freezes that one
+ *                                             language (check-dashboard gate 22 rejects the hoisted form).
  *                                             Declare EVERY lookup value — never drop one to save width (see
  *                                             defaultCollapsed; an undeclared value sends its cards to the fallback).
  *     defaultCollapsed?     string[]        — column keys that START collapsed (uncontrolled seed). A collapsed

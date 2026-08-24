@@ -95,6 +95,12 @@ for (const file of files) {
       let m;
       while ((m = re.exec(line)) !== null) {
         const val = m[2];
+        // An EMPTY literal is "nothing selected yet", never an invented key —
+        // `const INITIAL = { <lookupfield>: '' }` is the natural seed of an
+        // unselected radio group on a public form. Reporting it sent a repair
+        // agent through three attempts (union type → cast → renaming the whole
+        // field, plus every read site) for a value that was already correct.
+        if (val === '') continue;
         if (!keys.includes(val)) {
           errors.push(
             `${file}:${i + 1}: '${val}' is not a valid key for '${field}' — valid: ${keys.join(' | ')}. ` +

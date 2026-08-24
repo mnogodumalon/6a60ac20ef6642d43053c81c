@@ -19,6 +19,23 @@
 //      field type wants `undefined`, never `null` (live: two undo paths cost
 //      ~40s). Fix: `?? null` → `?? undefined`, only when the reported target
 //      type accepts undefined and rejects null.
+//   D. TS2367 `top.type === 'belegung_buchungen'` against an OverlayItem union
+//      that spells its keys camelCase. Two sources: a page written before
+//      0.0.326 (when the discriminant WAS the snake_case identifier) that an
+//      Update pulled the new scaffold under, and an agent falling back to the
+//      identifier out of habit. Fix: rewrite the literal to the union member
+//      it matches once `_` and case are ignored — only when exactly one
+//      member matches, and only for a literal the union does not already
+//      contain.
+//   E. TS2503 `icon: JSX.Element` — under `react-jsx` there is no global
+//      JSX namespace (live: one intent page cost a whole repair-agent
+//      round). Fix: rewrite the type to `React.ReactElement` and ensure a
+//      default React import — the exact rewrite the repair agent performed.
+//      Only `JSX.Element`; any other `JSX.*` stays for the agent.
+//   F. TS5076 `dKey || COLUMNS[…]?.key ?? ''` — `??` may not be mixed
+//      unparenthesized with `||`/`&&`. Fix: parenthesize the mixed child of
+//      the flagged expression AS TSC PARSED IT — zero semantic change, the
+//      grammar error disappears.
 //
 // A/B only apply when the property PROVABLY exists at the target (parsed
 // from the generated src/types/app.ts + src/types/enriched.ts) — no
@@ -107,20 +124,52 @@ function runTsc() {
 
 const ERROR_RE = /^(.+?)\((\d+),(\d+)\): error TS2339: Property '(.+?)' does not exist on type '(.+?)'\.$/;
 const NULL_RE = /^(.+?)\((\d+),(\d+)\): error TS2322: Type '(.+?)' is not assignable to type '(.+?)'\.$/;
+const CMP_RE = /^(.+?)\((\d+),(\d+)\): error TS2367: This comparison appears to be unintentional because the types '(.+?)' and '(.+?)' have no overlap\.$/;
+const JSX_RE = /^(.+?)\((\d+),(\d+)\): error TS2503: Cannot find namespace 'JSX'\.$/;
+const MIX_RE = /^(.+?)\((\d+),(\d+)\): error TS5076: '(?:\|\||&&|\?\?)' and '(?:\|\||&&|\?\?)' operations cannot be mixed without parentheses\.$/;
+
+/** Discriminant spellings compare equal once `_` and case are dropped. */
+function normKey(s) {
+  return s.replace(/_/g, '').toLowerCase();
+}
 
 function parseErrors(output) {
   const errors = [];
   const nullErrors = [];
+  const cmpErrors = [];
+  const jsxErrors = [];
+  const mixErrors = [];
   let total = 0;
   for (const line of output.split('\n')) {
     const trimmed = line.trim();
     if (/error TS\d+/.test(trimmed)) total += 1;
+    const j = trimmed.match(JSX_RE);
+    if (j) {
+      jsxErrors.push({ file: j[1], line: Number(j[2]), col: Number(j[3]) });
+      continue;
+    }
+    const x = trimmed.match(MIX_RE);
+    if (x) {
+      mixErrors.push({ file: x[1], line: Number(x[2]), col: Number(x[3]) });
+      continue;
+    }
     const m = trimmed.match(ERROR_RE);
     if (m) {
       const [, file, lineNo, col, prop, typeName] = m;
       // Only bare identifier types — our classes never involve unions/literals.
       if (/^[A-Za-z_$][\w$]*$/.test(typeName)) {
         errors.push({ file, line: Number(lineNo), col: Number(col), prop, typeName });
+      }
+      continue;
+    }
+    const c = trimmed.match(CMP_RE);
+    if (c) {
+      const [, file, lineNo, col, leftType, rightType] = c;
+      // Class D shape only: both sides are string-literal types, so the
+      // union of valid keys is right there in the message.
+      const lits = [...`${leftType} ${rightType}`.matchAll(/"([^"]*)"/g)].map((x) => x[1]);
+      if (lits.length >= 2) {
+        cmpErrors.push({ file, line: Number(lineNo), col: Number(col), lits });
       }
       continue;
     }
@@ -137,7 +186,7 @@ function parseErrors(output) {
       }
     }
   }
-  return { errors, nullErrors, total };
+  return { errors, nullErrors, cmpErrors, jsxErrors, mixErrors, total };
 }
 
 // ── Fixes ───────────────────────────────────────────────────────────
@@ -174,6 +223,98 @@ function findNullishNull(sf, line) {
 }
 
 // The property-access node the error points at: same line, same name.
+/** The string literal on `line` for which the message names exactly one
+ *  differently-spelled but equal-once-normalised counterpart. `valid` holds
+ *  the literals from BOTH sides of the comparison, so the wrong one is in
+ *  there too — hence the `v !== node.text` guard rather than a set lookup.
+ *  Two entities differing only in underscores would yield two matches and
+ *  heal nothing, which is the safe outcome. */
+function findDiscriminantLiteral(sf, line, valid) {
+  let hit = null;
+  const walk = (node) => {
+    if (hit) return;
+    if (ts.isStringLiteral(node)) {
+      const { line: nodeLine } = sf.getLineAndCharacterOfPosition(node.getStart(sf));
+      if (nodeLine === line - 1) {
+        const matches = valid.filter(
+          (v) => v !== node.text && normKey(v) === normKey(node.text),
+        );
+        if (matches.length === 1) hit = { node, target: matches[0] };
+      }
+    }
+    ts.forEachChild(node, walk);
+  };
+  walk(sf);
+  return hit;
+}
+
+// Class E: the `JSX.Element` type reference on `line`. Any other `JSX.*`
+// (IntrinsicElements, …) is NOT ours — it stays in the output for the agent.
+function findJsxElementType(sf, line) {
+  let found = null;
+  const visit = (n) => {
+    if (found) return;
+    if (
+      ts.isTypeReferenceNode(n) && ts.isQualifiedName(n.typeName) &&
+      ts.isIdentifier(n.typeName.left) && n.typeName.left.text === 'JSX' &&
+      n.typeName.right.text === 'Element' &&
+      sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1 === line
+    ) {
+      found = n;
+      return;
+    }
+    ts.forEachChild(n, visit);
+  };
+  visit(sf);
+  return found;
+}
+
+// `React.ReactElement` needs the default import. Upgrade the existing value
+// import from 'react' in place; otherwise add a standalone default import.
+function ensureReactDefaultImport(src) {
+  if (/(^|\n)import\s+React[\s,]/.test(src)) return src;
+  const named = src.match(/(^|\n)import\s*\{([^}]*)\}(\s*from\s*'react';)/);
+  if (named) {
+    return src.replace(named[0], `${named[1]}import React, {${named[2]}}${named[3]}`);
+  }
+  const sf = ts.createSourceFile('x.tsx', src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  let importEnd = 0;
+  for (const stmt of sf.statements) {
+    if (ts.isImportDeclaration(stmt)) importEnd = stmt.getEnd();
+  }
+  return src.slice(0, importEnd) + `\nimport React from 'react';` + src.slice(importEnd);
+}
+
+// Class F: the OUTERMOST binary expression on `line` that mixes `??` with
+// `||`/`&&` at one level. The fix parenthesizes the mixed CHILD exactly as
+// tsc parsed it — no semantic change, the grammar complaint disappears.
+const MIXABLE = new Set([
+  ts.SyntaxKind.QuestionQuestionToken,
+  ts.SyntaxKind.BarBarToken,
+  ts.SyntaxKind.AmpersandAmpersandToken,
+]);
+function findMixedChild(sf, line) {
+  let found = null;
+  const visit = (n) => {
+    if (found) return;
+    if (ts.isBinaryExpression(n) && MIXABLE.has(n.operatorToken.kind)) {
+      const { line: nodeLine } = sf.getLineAndCharacterOfPosition(n.getStart(sf));
+      if (nodeLine + 1 === line) {
+        const mixes = (c) =>
+          ts.isBinaryExpression(c) && MIXABLE.has(c.operatorToken.kind) &&
+          c.operatorToken.kind !== n.operatorToken.kind &&
+          (c.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken ||
+            n.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken);
+        if (mixes(n.left)) { found = n.left; return; }
+        if (mixes(n.right)) { found = n.right; return; }
+      }
+    }
+    ts.forEachChild(n, visit);
+  };
+  visit(sf);
+  return found;
+}
+
 function findAccess(sf, line, prop) {
   let found = null;
   const visit = (n) => {
@@ -256,7 +397,7 @@ function dropUnusedImport(src, name, filePath) {
   return src;
 }
 
-function healFile(filePath, errors, nullErrors, shapes) {
+function healFile(filePath, errors, nullErrors, cmpErrors, jsxErrors, mixErrors, shapes) {
   const before = readFileSync(filePath, 'utf8');
   const sf = ts.createSourceFile(
     filePath, before, ts.ScriptTarget.Latest, true,
@@ -267,6 +408,39 @@ function healFile(filePath, errors, nullErrors, shapes) {
   const fixed = [];
   const needImports = new Set();
   const retypedRaw = new Set();
+  let needReact = false;
+
+  // Class E: `JSX.Element` → `React.ReactElement` (+ default React import).
+  for (const err of jsxErrors) {
+    const node = findJsxElementType(sf, err.line);
+    if (!node) continue;
+    edits.push({ start: node.getStart(sf), end: node.getEnd(), text: 'React.ReactElement' });
+    needReact = true;
+    fixed.push({ file: filePath, line: err.line, kind: 'jsx-to-react-element' });
+  }
+
+  // Class F: parenthesize the mixed `??`/`||`/`&&` child as parsed.
+  for (const err of mixErrors) {
+    const child = findMixedChild(sf, err.line);
+    if (!child) continue;
+    const start = child.getStart(sf);
+    const end = child.getEnd();
+    edits.push({ start, end, text: `(${before.slice(start, end)})` });
+    fixed.push({ file: filePath, line: err.line, kind: 'parenthesize-mixed-ops' });
+  }
+
+  // Class D: a discriminant literal in the other spelling (see header).
+  for (const err of cmpErrors) {
+    const found = findDiscriminantLiteral(sf, err.line, err.lits);
+    if (!found) continue;
+    const quote = before[found.node.getStart(sf)];
+    edits.push({
+      start: found.node.getStart(sf),
+      end: found.node.getEnd(),
+      text: `${quote}${found.target}${quote}`,
+    });
+    fixed.push(`${filePath}:${err.line} discriminant '${found.node.text}' → '${found.target}'`);
+  }
 
   // Class C: `?? null` where the payload type wants undefined.
   for (const err of nullErrors) {
@@ -335,6 +509,7 @@ function healFile(filePath, errors, nullErrors, shapes) {
   for (const e of unique) out = out.slice(0, e.start) + e.text + out.slice(e.end);
   for (const name of needImports) out = ensureEnrichedImport(out, name);
   for (const name of retypedRaw) out = dropUnusedImport(out, name, filePath);
+  if (needReact) out = ensureReactDefaultImport(out);
   verifyParses(out, filePath);
   writeFileSync(filePath, out);
   return fixed;
@@ -364,7 +539,10 @@ const shapes = {
   enriched: parseEnriched(),
 };
 
-const files = new Set([...parsed.errors, ...parsed.nullErrors].map((e) => e.file));
+const files = new Set(
+  [...parsed.errors, ...parsed.nullErrors, ...parsed.cmpErrors,
+   ...parsed.jsxErrors, ...parsed.mixErrors].map((e) => e.file),
+);
 const fixed = [];
 for (const file of files) {
   if (!existsSync(file)) continue;
@@ -373,6 +551,9 @@ for (const file of files) {
       file,
       parsed.errors.filter((e) => e.file === file),
       parsed.nullErrors.filter((e) => e.file === file),
+      parsed.cmpErrors.filter((e) => e.file === file),
+      parsed.jsxErrors.filter((e) => e.file === file),
+      parsed.mixErrors.filter((e) => e.file === file),
       shapes,
     ));
   } catch (e) {

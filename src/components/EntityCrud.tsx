@@ -12,6 +12,9 @@
  *       ? { label: …, onClick: () => … }
  *       : undefined,
  *   });
+ *
+ *   `top.type` is the SAME camelCase key as `crud.<entity>` — one spelling
+ *   per entity, everywhere in this API.
  *   …
  *   crud.projekte.openCreate({ …defaults })   // create dialog, prefilled — defaults are
  *                                       // shape-tolerant: bare lookup keys / record ids are fine
@@ -20,8 +23,11 @@
  *                                       // enrichment is resolved inside
  *   crud.overlay                         // RecordOverlayStack<OverlayItem> for drills:
  *                                       // push / pop / replace / close
- *   crud.enriched.aufgaben              // memoized Enriched* arrays — reuse these,
- *                                       // never call enrich*() yourself in the page
+ *   crud.enriched.projekte              // the display-ready array for EVERY entity —
+ *                                       // Enriched* where relations exist, the raw array
+ *                                       // otherwise. Reuse these; never call enrich*()
+ *                                       // in the page, and never guess which entity has
+ *                                       // one: they all do.
  *   {crud.surfaces}                      // render ONCE at the end of the page JSX:
  *                                       // all entity dialogs + the overlay host
  *
@@ -89,8 +95,10 @@ export interface EntityCrud {
   surfaces: ReactNode;
   projekte: EntityCrudApi<Projekte, ProjekteDialogDefaults>;
   aufgaben: EntityCrudApi<Aufgaben, AufgabenDialogDefaults>;
-  /** Memoized Enriched* arrays — reuse these, never re-enrich in the page. */
-  enriched: { aufgaben: EnrichedAufgaben[] };
+  /** The display-ready array per entity: Enriched* where an enrich function
+   *  exists, the raw array otherwise. One key per entity so no page has to
+   *  know which is which. Reuse these; never re-enrich in the page. */
+  enriched: { projekte: Projekte[]; aufgaben: EnrichedAufgaben[] };
 }
 
 export function useEntityCrud(data: EntityCrudData, options?: EntityCrudOptions): EntityCrud {
@@ -231,6 +239,6 @@ export function useEntityCrud(data: EntityCrudData, options?: EntityCrudOptions)
       openEdit: (record: Aufgaben) => setAufgabenDialog({ editing: record, defaults: record.fields }),
       openDetail: (record: Aufgaben) => detailAufgaben(record, false),
     },
-    enriched: { aufgaben: enrichedAufgaben },
+    enriched: { projekte: data.projekte, aufgaben: enrichedAufgaben },
   };
 }

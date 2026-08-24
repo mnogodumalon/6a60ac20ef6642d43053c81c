@@ -40,6 +40,14 @@
       laLoader.type = 'module';
       laLoader.src = '/react-webcomponents/current/loader.js';
       document.head.appendChild(laLoader);
+      // Klar assistant (<la-klar-assistant>, mounted in Layout) — appended
+      // dynamically like the loader: an absolute module src in HTML breaks
+      // vite build. In the E2B preview sandbox the path 404s harmlessly
+      // (the tag stays inert).
+      var klarEmbed = document.createElement('script');
+      klarEmbed.type = 'module';
+      klarEmbed.src = '/actions-agent/embed/embed.js';
+      document.head.appendChild(klarEmbed);
     </script>
   </head>
   <body>

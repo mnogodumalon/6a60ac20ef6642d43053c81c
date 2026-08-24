@@ -43,8 +43,8 @@ export interface IntentLink {
 
 export const INTENTS: IntentLink[] = [
   // <custom:intents>
-  { path: '/intents/projekt-starten', label: { de: 'Projekt starten', en: 'Start project' }, icon: IconFolderPlus, description: 'Neues Projekt anlegen und erste Aufgaben hinzufügen' },
-  { path: '/intents/aufgabe-erledigen', label: { de: 'Aufgabe erledigen', en: 'Complete task' }, icon: IconCircleCheck, description: 'Offene Aufgabe suchen und Status vorrücken' },
+  { path: '/intents/projekt-starten', label: { de: 'Projekt starten', en: 'Start project' }, icon: IconFolderPlus, description: { de: 'Neues Projekt anlegen und erste Aufgaben hinzufügen', en: 'Create new project and add first tasks' } },
+  { path: '/intents/aufgabe-erledigen', label: { de: 'Aufgabe erledigen', en: 'Complete task' }, icon: IconCircleCheck, description: { de: 'Offene Aufgabe suchen und Status vorrücken', en: 'Search open task and advance status' } },
   // </custom:intents>
 ];
 

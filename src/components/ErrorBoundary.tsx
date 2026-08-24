@@ -6,6 +6,17 @@ import { t } from '@/i18n';
 const APPGROUP_ID = '6a60ac20ef6642d43053c81c';
 const REPAIR_ENDPOINT = '/claude/build/repair';
 
+/** Public routes are open to strangers, so a crash there must NOT offer the
+ *  repair agent: every click starts a sandbox build, and `/build/repair`
+ *  falls back to the server's own API key when a request carries no session
+ *  cookie — an anonymous visitor could otherwise trigger builds at will.
+ *  They also must not read a raw error message. Crashes are still reported
+ *  to Sentry (tagged `public`), so nothing is lost on our side; the visitor
+ *  just gets a plain retry. */
+function isPublicRoute(): boolean {
+  return window.location.hash.startsWith('#/public');
+}
+
 interface State {
   hasError: boolean;
   error: Error | null;
@@ -35,7 +46,11 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
     this.setState({ componentStack: info.componentStack ?? '' });
     Sentry.captureException(error, {
       contexts: { react: { componentStack: info.componentStack ?? '' } },
-      tags: { appgroup_id: APPGROUP_ID, source: 'error_boundary' },
+      tags: {
+        appgroup_id: APPGROUP_ID,
+        source: 'error_boundary',
+        surface: isPublicRoute() ? 'public' : 'app',
+      },
     });
   }
 
@@ -122,11 +137,21 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
               ? t('repair_done_desc')
               : repairing
                 ? repairStatus
-                : this.state.error?.message}
+                : isPublicRoute()
+                  ? t('pf_error_generic_text')
+                  : this.state.error?.message}
           </p>
         </div>
         <div className="flex gap-2">
           {repairDone ? (
+            <button
+              onClick={() => window.location.reload()}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground px-3 py-1.5 text-sm font-medium hover:bg-primary/90 transition-colors"
+            >
+              <IconRefresh size={14} />
+              {t('repair_reload')}
+            </button>
+          ) : isPublicRoute() ? (
             <button
               onClick={() => window.location.reload()}
               className="inline-flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground px-3 py-1.5 text-sm font-medium hover:bg-primary/90 transition-colors"

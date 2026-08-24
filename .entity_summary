@@ -13,12 +13,13 @@ Modules — copy these paths verbatim into a subagent brief:
   @/types/enriched                       EnrichedAufgaben — the COMPLETE list, no other Enriched* type exists
   @/lib/enrich                           the enrich functions — exact fields and signatures on the `✚` line of each entity below; every listed map is REQUIRED, and no other enriched field exists
   @/services/livingAppsService           LivingAppsService, createRecordUrl, extractRecordId
-  @/hooks/useDashboardData               useDashboardData
+  @/hooks/useDashboardData               useDashboardData — the RAW arrays (one per entity, camelCase), their setters, loading, error, fetchAll + projekteMap; it carries NO enriched arrays — build those with the `✚` call below
   @/lib/formatters                       lookupKey, formatDate
   @/components/blocks/IntentWizardShell  IntentWizardShell
   @/components/blocks/EntitySelectStep   EntitySelectStep
   @/components/blocks/StatusBadge        StatusBadge, getStatusColor
   @/components/blocks/BudgetTracker      BudgetTracker
+  @/components/blocks/AvailabilityRangePicker  AvailabilityRangePicker, rangeIsFree, isNightBlocked
 There is NO `@/config/appIds`, no `@/config/lookupOptions` and no
 `@/lib/urlUtils` — APP_IDS and LOOKUP_OPTIONS come from `@/types/app`,
 createRecordUrl from the service. Note the lowercase `l` in the service path.

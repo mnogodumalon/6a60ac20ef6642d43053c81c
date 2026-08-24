@@ -8,14 +8,14 @@ Your job: Analyze data (1-2 sentences), Read then Write DashboardOverview.tsx (o
 Large custom UI blocks (a self-contained concept of ~60+ lines no widget covers) are NOT written inline: dictate the props interface in a brief, dispatch build_components (ONE call, all components), write the Overview against your own interface, and call await_components before any gate or build — see CLAUDE.md Step 1b.
 Loading/error UIs are pre-generated in src/components/DashboardStates.tsx — keep the DashboardSkeleton/DashboardError import and the two early-returns; never re-implement them.
 Component API contracts (EntityCrud — the CRUD/overlay plumbing — plus DashboardGrid, WorkList, HeroBanner, StatCard, SatelliteSection, polish, RecordView) are inlined in the cheatsheet section below — do NOT Read those files. Read a widget file only for the ONE widget you compose (plus its .example.tsx).
-Dialogs and the record overlay are OWNED by the pre-generated useEntityCrud()/{crud.surfaces} (contract in the cheatsheet below): wire EVERY record click to crud.<entity>.openDetail(record), creates/edits to crud.<entity>.openCreate(defaults)/openEdit(record), put the record's next workflow step into the footer option, and keep {crud.surfaces} as the LAST child of the page JSX. Never re-roll dialog state, submit handlers, an overlay stack or a RecordOverlayHost — completeness of the overlay bodies is generated, but WHICH clicks open them is on you: every entity the user can see needs its click wired.
+Dialogs and the record overlay are OWNED by the pre-generated useEntityCrud()/{crud.surfaces} (contract in the cheatsheet below): wire EVERY record click to crud.<entity>.openDetail(record), creates/edits to crud.<entity>.openCreate(defaults)/openEdit(record), put the record's next workflow step into the footer option, and keep {crud.surfaces} as the LAST child of the page JSX. `<entity>` is the camelCase key spelled out in the contract below — the SAME key everywhere in this API, `top.type` included; the snake_case identifier is never an API key (a live build wrote crud.<snake_case> and lost a whole build cycle to TS2551, in the same file where it had used the camelCase form correctly two lines up). Never re-roll dialog state, submit handlers, an overlay stack or a RecordOverlayHost — completeness of the overlay bodies is generated, but WHICH clicks open them is on you: every entity the user can see needs its click wired.
 The Enriched* types are inlined below IN FULL — take those field names verbatim; never infer one from the target entity.
 Entity display names come from appLabel(key) — every key is listed below; never re-type a name, and never wrap one in a local helper.
 index.css is pre-generated with the shared design system. Do NOT edit it.
 src/config/ai-features.ts is editable — set AI_PHOTO_SCAN['Entity'] = true to enable photo scan in dialogs.
 NEVER use Bash cat/echo/heredoc for file operations — always use Read/Write/Edit tools.
 
-Generated 108 scaffold files:
+Generated 95 scaffold files:
   - src/App.tsx
   - src/i18n/index.ts
   - src/i18n/common.ts
@@ -24,15 +24,10 @@ Generated 108 scaffold files:
   - src/components/Layout.tsx
   - src/types/la-widgets.d.ts
   - src/components/PageShell.tsx
-  - src/components/ActionsBar.tsx
   - src/components/ActionsSidebar.tsx
-  - src/components/ActionsDrawer.tsx
-  - src/pages/DashboardOverview.tsx
   - src/components/DashboardStates.tsx
   - src/components/ConfirmDialog.tsx
-  - src/components/ActionInputDialog.tsx
   - src/components/StatCard.tsx
-  - src/components/TypingDots.tsx
   - src/components/DashboardGrid.tsx
   - src/components/WorkList.tsx
   - src/components/HeroBanner.tsx
@@ -53,8 +48,6 @@ Generated 108 scaffold files:
   - src/components/DatePicker.tsx
   - .placeholder-tasks.json
   - src/config/form-enhancements/types.ts
-  - src/config/form-enhancements/Projekte.ts
-  - src/config/form-enhancements/Aufgaben.ts
   - scripts/parse-formulas.mjs
   - scripts/apply-placeholders.mjs
   - src/config/intents.ts
@@ -67,19 +60,13 @@ Generated 108 scaffold files:
   - src/components/BudgetTracker.tsx
   - src/components/blocks/StatusBadge.tsx
   - src/components/StatusBadge.tsx
+  - src/components/blocks/AvailabilityRangePicker.tsx
   - src/index.css
   - src/lib/sentry.ts
   - src/lib/stale-bundle.ts
   - src/lib/ai.ts
-  - src/lib/highlight.tsx
-  - src/lib/run-results.ts
-  - src/lib/actions-agent.ts
-  - src/context/ActionsContext.tsx
-  - src/components/ChatWidget.tsx
-  - src/components/ActionCodeDrawer.tsx
   - src/components/VersionCheck.tsx
   - src/components/AttachmentsSection.tsx
-  - src/config/ai-features.ts
   - src/lib/formatters.ts
   - src/lib/polish.ts
   - src/hooks/useDashboardData.ts
@@ -227,6 +214,9 @@ contracts; Read one only if the contract below is insufficient.
  *       ? { label: …, onClick: () => … }
  *       : undefined,
  *   });
+ *
+ *   `top.type` is the SAME camelCase key as `crud.<entity>` — one spelling
+ *   per entity, everywhere in this API.
  *   …
  *   crud.projekte.openCreate({ …defaults })   // create dialog, prefilled — defaults are
  *                                       // shape-tolerant: bare lookup keys / record ids are fine
@@ -235,8 +225,11 @@ contracts; Read one only if the contract below is insufficient.
  *                                       // enrichment is resolved inside
  *   crud.overlay                         // RecordOverlayStack<OverlayItem> for drills:
  *                                       // push / pop / replace / close
- *   crud.enriched.aufgaben              // memoized Enriched* arrays — reuse these,
- *                                       // never call enrich*() yourself in the page
+ *   crud.enriched.projekte              // the display-ready array for EVERY entity —
+ *                                       // Enriched* where relations exist, the raw array
+ *                                       // otherwise. Reuse these; never call enrich*()
+ *                                       // in the page, and never guess which entity has
+ *                                       // one: they all do.
  *   {crud.surfaces}                      // render ONCE at the end of the page JSX:
  *                                       // all entity dialogs + the overlay host
  *

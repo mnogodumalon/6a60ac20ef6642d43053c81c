@@ -309,7 +309,7 @@ export function ProjekteDialog({ open, onClose, onSubmit, defaultValues, recordI
         <Label htmlFor="projektname">{fieldLabel('projekte', 'projektname')} <span className="text-destructive" aria-hidden="true">*</span></Label>
         <Input
           id="projektname"
-          placeholder="z. B. Website Redesign"
+          placeholder=""
           value={fields.projektname ?? ''}
           onChange={e => setFields(f => ({ ...f, projektname: e.target.value }))}
           required
@@ -324,7 +324,7 @@ export function ProjekteDialog({ open, onClose, onSubmit, defaultValues, recordI
         <Label htmlFor="beschreibung">{fieldLabel('projekte', 'beschreibung')}</Label>
         <Textarea
           id="beschreibung"
-          placeholder="Projektumfang, Ziele, Besonderheiten..."
+          placeholder=""
           value={fields.beschreibung ?? ''}
           onChange={e => setFields(f => ({ ...f, beschreibung: e.target.value }))}
           rows={3}
@@ -336,7 +336,7 @@ export function ProjekteDialog({ open, onClose, onSubmit, defaultValues, recordI
         <Label htmlFor="vorname">{fieldLabel('projekte', 'vorname')} <span className="text-destructive" aria-hidden="true">*</span></Label>
         <Input
           id="vorname"
-          placeholder="z. B. Max"
+          placeholder=""
           value={fields.vorname ?? ''}
           onChange={e => setFields(f => ({ ...f, vorname: e.target.value }))}
           required
@@ -351,7 +351,7 @@ export function ProjekteDialog({ open, onClose, onSubmit, defaultValues, recordI
         <Label htmlFor="nachname">{fieldLabel('projekte', 'nachname')} <span className="text-destructive" aria-hidden="true">*</span></Label>
         <Input
           id="nachname"
-          placeholder="z. B. Müller"
+          placeholder=""
           value={fields.nachname ?? ''}
           onChange={e => setFields(f => ({ ...f, nachname: e.target.value }))}
           required
@@ -366,7 +366,7 @@ export function ProjekteDialog({ open, onClose, onSubmit, defaultValues, recordI
         <Label htmlFor="startdatum">{fieldLabel('projekte', 'startdatum')} <span className="text-destructive" aria-hidden="true">*</span></Label>
         <DatePicker
           id="startdatum"
-          placeholder="Wann startet das Projekt?"
+          placeholder=""
           mode="date"
           value={fields.startdatum ?? null}
           onChange={v => setFields(f => ({ ...f, startdatum: v ?? undefined }))}
@@ -382,7 +382,7 @@ export function ProjekteDialog({ open, onClose, onSubmit, defaultValues, recordI
         <Label htmlFor="enddatum">{fieldLabel('projekte', 'enddatum')}</Label>
         <DatePicker
           id="enddatum"
-          placeholder="Geplantes Enddatum?"
+          placeholder=""
           mode="date"
           value={fields.enddatum ?? null}
           onChange={v => setFields(f => ({ ...f, enddatum: v ?? undefined }))}

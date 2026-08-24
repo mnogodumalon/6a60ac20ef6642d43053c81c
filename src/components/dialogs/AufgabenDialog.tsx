@@ -349,7 +349,7 @@ export function AufgabenDialog({ open, onClose, onSubmit, defaultValues, recordI
         <Label htmlFor="projekt">{fieldLabel('aufgaben', 'projekt')} <span className="text-destructive" aria-hidden="true">*</span></Label>
         <Combobox
           id="projekt"
-          placeholder="Welches Projekt?"
+          placeholder=""
           items={projekteListAll.map(r => ({
             id: r.record_id,
             label: String(r.fields.projektname ?? r.record_id),
@@ -369,7 +369,7 @@ export function AufgabenDialog({ open, onClose, onSubmit, defaultValues, recordI
         <Label htmlFor="titel">{fieldLabel('aufgaben', 'titel')} <span className="text-destructive" aria-hidden="true">*</span></Label>
         <Input
           id="titel"
-          placeholder="z. B. Mockups erstellen"
+          placeholder=""
           value={fields.titel ?? ''}
           onChange={e => setFields(f => ({ ...f, titel: e.target.value }))}
           required
@@ -384,7 +384,7 @@ export function AufgabenDialog({ open, onClose, onSubmit, defaultValues, recordI
         <Label htmlFor="aufgabe_beschreibung">{fieldLabel('aufgaben', 'aufgabe_beschreibung')}</Label>
         <Textarea
           id="aufgabe_beschreibung"
-          placeholder="Was ist zu tun? Anforderungen, Hinweise..."
+          placeholder=""
           value={fields.aufgabe_beschreibung ?? ''}
           onChange={e => setFields(f => ({ ...f, aufgabe_beschreibung: e.target.value }))}
           rows={3}
@@ -445,7 +445,7 @@ export function AufgabenDialog({ open, onClose, onSubmit, defaultValues, recordI
         <Label htmlFor="faelligkeitsdatum">{fieldLabel('aufgaben', 'faelligkeitsdatum')}</Label>
         <DatePicker
           id="faelligkeitsdatum"
-          placeholder="Bis wann erledigt?"
+          placeholder=""
           mode="date"
           value={fields.faelligkeitsdatum ?? null}
           onChange={v => setFields(f => ({ ...f, faelligkeitsdatum: v ?? undefined }))}
@@ -506,7 +506,7 @@ export function AufgabenDialog({ open, onClose, onSubmit, defaultValues, recordI
         <Label htmlFor="zustaendig_vorname">{fieldLabel('aufgaben', 'zustaendig_vorname')}</Label>
         <Input
           id="zustaendig_vorname"
-          placeholder="z. B. Anna"
+          placeholder=""
           value={fields.zustaendig_vorname ?? ''}
           onChange={e => setFields(f => ({ ...f, zustaendig_vorname: e.target.value }))}
         />
@@ -517,7 +517,7 @@ export function AufgabenDialog({ open, onClose, onSubmit, defaultValues, recordI
         <Label htmlFor="zustaendig_nachname">{fieldLabel('aufgaben', 'zustaendig_nachname')}</Label>
         <Input
           id="zustaendig_nachname"
-          placeholder="z. B. Schmidt"
+          placeholder=""
           value={fields.zustaendig_nachname ?? ''}
           onChange={e => setFields(f => ({ ...f, zustaendig_nachname: e.target.value }))}
         />

@@ -44,6 +44,15 @@ declare namespace React {
         mode?: 'navigate' | 'select';
         'data-nav'?: string;
       }>;
+      /** Klar assistant (chat + Werkzeuge + code viewer) — platform chrome,
+       *  loaded via /actions-agent/embed/embed.js. `actions-open` is a state
+       *  attribute: setting it opens the actions drawer, the element reflects
+       *  it back on open/close. Events: dispatches assistant:data-changed
+       *  (bubbles + composed) after every mutation. */
+      'la-klar-assistant': LaWidgetProps<{
+        'appgroup-id'?: string;
+        'actions-open'?: boolean;
+      }>;
       'la-nav-section': LaWidgetProps<{
         type?: 'primary' | 'secondary';
         label?: string;

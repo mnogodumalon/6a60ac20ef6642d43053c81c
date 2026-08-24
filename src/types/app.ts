@@ -3,6 +3,12 @@ import { lookupLabel } from '@/i18n';
 // AUTOMATICALLY GENERATED TYPES - DO NOT EDIT
 
 export type LookupValue = { key: string; label: string };
+/** A raw record URL (applookup reference). NEVER render this directly
+ *  in JSX — it is a URL, not a display value. Show the enriched `*Name`
+ *  field or resolve it via the entity map instead. Assignable to/from
+ *  string everywhere; the `& {}` keeps the alias NAME visible in tsc
+ *  error messages (a plain primitive alias gets normalized away). */
+export type RecordUrl = string & {};
 export type GeoLocation = { lat: number; long: number; info?: string };
 
 export type AttachmentType = 'file' | 'note' | 'url' | 'json';
@@ -55,7 +61,7 @@ export interface Aufgaben {
   createdat: string;
   updatedat: string | null;
   fields: {
-    projekt?: string; // applookup -> URL zu 'Projekte' Record
+    projekt?: RecordUrl; // applookup -> URL zu 'Projekte' Record
     titel?: string;
     aufgabe_beschreibung?: string;
     prioritaet?: LookupValue;

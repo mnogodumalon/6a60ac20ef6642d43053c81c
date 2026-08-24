@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, Fragment } from 'react';
+import { useState, useEffect, useCallback, useRef, Fragment } from 'react';
+import { toast } from 'sonner';
 import { IconRefresh, IconHistory, IconLoader, IconChevronDown, IconCheck, IconClock, IconArrowBackUp, IconSparkles, IconMessageCircle, IconGitBranch, IconArrowLeft, IconFlask } from '@tabler/icons-react';
 import {
   Dialog,
@@ -9,7 +10,6 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { useActions } from '@/context/ActionsContext';
 import { t, localeTag } from '@/i18n';
 
 const APPGROUP_ID = '6a60ac20ef6642d43053c81c';
@@ -17,6 +17,14 @@ const UPDATE_ENDPOINT = '/claude/build/update';
 const DEPLOYMENTS_ENDPOINT = `/claude/build/deployments/${APPGROUP_ID}`;
 const ROLLBACK_ENDPOINT = '/claude/build/rollback';
 const VERSION_ENDPOINT = '/claude/version';
+const AGENT_STATE_ENDPOINT = `/claude/build/agent-state/${APPGROUP_ID}`;
+
+// Fremd-Build-Beobachtung (Editor-Save, Weiche, coalescte Nachbauten):
+// eng pollen solange ein Build läuft, sonst selten — der Endpoint ist billig,
+// aber ein stilles Dashboard braucht keine Frequenz.
+const BUILD_ACTIVE_POLL_MS = 5000;
+const BUILD_IDLE_POLL_MS = 45000;
+const BUILD_ERROR_POLL_MS = 60000;
 
 // Poll cadence after a deploy receipt: wait for S3 version.json to reflect
 // the expected codebase SHA before reloading. 30 s ceiling to avoid hanging
@@ -67,9 +75,10 @@ interface DeployedVersion {
   codebase?: string;
   deployed_at?: string;
   source?: string;
+  metadata_fingerprint?: string;
 }
 
-type Status = 'idle' | 'loading' | 'updating' | 'verifying' | 'rolling_back' | 'error';
+type Status = 'idle' | 'loading' | 'updating' | 'verifying' | 'rolling_back' | 'busy' | 'error';
 
 function rollbackId(d: Deployment): string {
   // Prefer sha; fall back to legacy timestamp for attic-only deployments
@@ -143,10 +152,40 @@ function ConfirmPrompt({ open, title, description, confirmLabel, onCancel, onCon
   );
 }
 
+// Dev/beta flags — shared with the assistant (<la-klar-assistant>): both read
+// the same sources (localStorage 'developer-mode', 'channel' cookie). After
+// each toggle, assistant:flags-changed tells the element to re-read the
+// sources, so the switch applies without a reload.
+function readChannelCookie(): boolean {
+  if (typeof document === 'undefined') return false;
+  return document.cookie.split('; ').some(c => c === 'channel=beta');
+}
+
+function useAssistantFlags() {
+  const [devMode, setDevModeState] = useState(() => {
+    try { return localStorage.getItem('developer-mode') === 'true'; } catch { return false; }
+  });
+  const [betaMode, setBetaModeState] = useState(() => {
+    try { return readChannelCookie(); } catch { return false; }
+  });
+  const setDevMode = useCallback((v: boolean) => {
+    setDevModeState(v);
+    try { localStorage.setItem('developer-mode', String(v)); } catch { /* private mode */ }
+    window.dispatchEvent(new Event('assistant:flags-changed'));
+  }, []);
+  const setBetaMode = useCallback((v: boolean) => {
+    setBetaModeState(v);
+    const value = v ? 'beta' : 'stable';
+    document.cookie = `channel=${value}; path=/; max-age=31536000; SameSite=Lax`;
+    window.dispatchEvent(new Event('assistant:flags-changed'));
+  }, []);
+  return { devMode, setDevMode, betaMode, setBetaMode };
+}
+
 export function VersionCheck() {
   // Entwickler/Beta-Toggles leben im aufklappbaren Versions-Panel statt in
   // der Nav — normale Nutzer brauchen sie nie, Entwickler suchen sie hier.
-  const { devMode, setDevMode, betaMode, setBetaMode } = useActions();
+  const { devMode, setDevMode, betaMode, setBetaMode } = useAssistantFlags();
   const [status, setStatus] = useState<Status>('loading');
   const [deployedVersion, setDeployedVersion] = useState('');
   const [deployedCommit, setDeployedCommit] = useState('');
@@ -161,6 +200,20 @@ export function VersionCheck() {
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
   const [rollbackDialog, setRollbackDialog] = useState<Deployment | null>(null);
   const [statusMessage, setStatusMessage] = useState('');
+  // Belegtes Schreib-Lease: der Update-Wunsch wurde serverseitig vorgemerkt
+  // ([BUSY]-Event mit queued=true) und läuft automatisch nach dem Build.
+  const [busyAgeMin, setBusyAgeMin] = useState(1);
+  // Fremd-Build sichtbar machen: null = kein Build aktiv. Solange ein Build
+  // läuft, ERSETZT die Build-Karte den Update-Button — ein Klick würde
+  // ohnehin nur im Ein-Platz-Slot vorgemerkt.
+  const [buildPct, setBuildPct] = useState<number | null>(null);
+  // Fehlerzustand nur für Builds, die WIR laufen sahen — ein uralter
+  // failed-Stand in agent_states darf beim Seitenladen keine rote Karte
+  // erzeugen. Verschwindet, sobald der nächste Build startet.
+  const [buildFailed, setBuildFailed] = useState(false);
+  const sawBuilding = useRef(false);
+  const baselineRef = useRef<DeployedVersion | null>(null);
+  const freshNotified = useRef(false);
 
   const applyDeployed = useCallback((d: DeployedVersion, latest: string) => {
     setDeployedVersion(d.version || '');
@@ -194,11 +247,117 @@ export function VersionCheck() {
         const service = await serviceRes.json();
         setLatestVersion(service.version || '');
         applyDeployed(deployed, service.version || '');
+        // Baseline für die Frisch-Deploy-Erkennung: der Stand, mit dem DIESE
+        // Seite geladen wurde.
+        baselineRef.current = deployed;
         setStatus('idle');
       } catch { setStatus('idle'); }
     })();
     return () => { cancelled = true; };
   }, [applyDeployed]);
+
+  // Fremd-Builds beobachten (Editor-Save, Weiche, vorgemerkte Nachbauten):
+  // Build-Karte solange agent-state build_status=building meldet, danach —
+  // wenn version.json einen NEUEN codebase trägt — persistenter Toast mit
+  // „Neu laden". Auto-Reload NUR bei unsichtbarem Tab ohne offenen Dialog:
+  // niemandem wird die Seite unterm Formular weggezogen. Fail-silent: jeder
+  // Fetch-Fehler blendet die Karte aus und pollt langsamer.
+  useEffect(() => {
+    let cancelled = false;
+    let running = false;
+    let timer: number | undefined;
+
+    function notifyFresh(structureChanged: boolean) {
+      const dialogOpen = !!document.querySelector('[role="dialog"]');
+      if (document.hidden && !dialogOpen) {
+        window.location.reload();
+        return;
+      }
+      // toast.custom statt toast(): der Standard-Sonner-Look passt nicht zum
+      // Dashboard — die Karte hier nutzt dieselben Tokens wie der Rest.
+      toast.custom((toastId) => (
+        <div className="w-[356px] max-w-[calc(100vw-2rem)] rounded-2xl border border-border bg-card text-card-foreground shadow-lg p-4 flex items-start gap-3">
+          <div className="h-9 w-9 shrink-0 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+            <IconCheck size={18} stroke={2} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold leading-snug">{t('vc_updated_toast')}</p>
+            {structureChanged && (
+              <p className="mt-0.5 text-xs text-muted-foreground leading-snug">{t('vc_updated_toast_desc')}</p>
+            )}
+            <div className="mt-2.5 flex items-center gap-2">
+              <button
+                onClick={() => window.location.reload()}
+                className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+              >
+                {t('vc_updated_reload')}
+              </button>
+              <button
+                onClick={() => toast.dismiss(toastId)}
+                className="rounded-lg px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary transition-colors"
+              >
+                {t('vc_updated_later')}
+              </button>
+            </div>
+          </div>
+        </div>
+      ), { duration: Infinity });
+    }
+
+    async function tick() {
+      if (cancelled || running) return;
+      running = true;
+      let next = BUILD_IDLE_POLL_MS;
+      try {
+        const res = await fetch(AGENT_STATE_ENDPOINT, { credentials: 'include', cache: 'no-store' });
+        if (!res.ok) throw new Error(String(res.status));
+        const state: { build_status?: string | null; build_pct?: number | null } = await res.json();
+        if (state.build_status === 'building') {
+          sawBuilding.current = true;
+          setBuildFailed(false);
+          setBuildPct(typeof state.build_pct === 'number' ? state.build_pct : 0);
+          next = BUILD_ACTIVE_POLL_MS;
+        } else {
+          setBuildPct(null);
+          setBuildFailed(state.build_status === 'failed' && sawBuilding.current);
+          if (!freshNotified.current && baselineRef.current?.codebase) {
+            const now = await fetchDeployedVersion();
+            if (now?.codebase && now.codebase !== baselineRef.current.codebase) {
+              freshNotified.current = true;
+              // Struktur-Hinweis nur bei ECHTEM Fingerprint-Wechsel: Alt-
+              // Dashboards (legacy-backfill) tragen noch keinen Fingerprint —
+              // undefined !== "…" wäre eine falsche Warnung.
+              notifyFresh(
+                !!baselineRef.current.metadata_fingerprint &&
+                !!now.metadata_fingerprint &&
+                now.metadata_fingerprint !== baselineRef.current.metadata_fingerprint,
+              );
+            }
+          }
+        }
+      } catch {
+        setBuildPct(null);
+        next = BUILD_ERROR_POLL_MS;
+      }
+      running = false;
+      if (!cancelled) timer = window.setTimeout(tick, next);
+    }
+
+    tick();
+    // Beim Zurückkehren in den Tab sofort prüfen statt aufs Intervall zu warten.
+    const onVisibility = () => {
+      if (!document.hidden && !running) {
+        window.clearTimeout(timer);
+        void tick();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, []);
 
   const loadDeployments = useCallback(async () => {
     if (deployments.length > 0) return;
@@ -238,6 +397,18 @@ export function VersionCheck() {
           const content = line.slice(6);
           if (content.startsWith('[UPDATED] ')) {
             try { receipt = JSON.parse(content.slice(10)); } catch { /* ignore */ }
+          } else if (content.startsWith('[BUSY] ')) {
+            // Ein Build läuft bereits — der Server hat das Update in den
+            // Ein-Platz-Slot übernommen. Positiver Zustand, kein Fehler.
+            let ageMin = 1;
+            try {
+              const info = JSON.parse(content.slice(7));
+              ageMin = Math.max(1, Math.floor((info.age_seconds || 0) / 60));
+            } catch { /* ignore */ }
+            setBusyAgeMin(ageMin);
+            setStatus('busy');
+            try { reader.cancel(); } catch { /* ignore */ }
+            return;
           } else if (content.startsWith('[DONE]')) {
             done = true;
             break;
@@ -294,6 +465,14 @@ export function VersionCheck() {
         credentials: 'include',
         body: JSON.stringify(body),
       });
+      if (resp.status === 409) {
+        // Schreib-Lease belegt — Rollback ist ein harter Busy-Stopp (anders
+        // als das Update, das serverseitig vorgemerkt wird).
+        setStatusMessage(t('busy_build_running'));
+        setStatus('error');
+        setRollbackTarget(null);
+        return;
+      }
       if (!resp.ok) { setStatus('error'); setRollbackTarget(null); return; }
 
       // Verify in two dimensions:
@@ -332,7 +511,7 @@ export function VersionCheck() {
     const Icon = status === 'rolling_back' ? IconHistory : IconRefresh;
     return (
       <div className="flex items-center gap-2 px-4 py-2 text-xs text-muted-foreground">
-        <Icon size={14} className="shrink-0 animate-spin" />
+        <Icon size={14} className="shrink-0 animate-spin [animation-direction:reverse]" />
         <span>{label}</span>
       </div>
     );
@@ -357,8 +536,28 @@ export function VersionCheck() {
         <IconChevronDown size={13} className={`shrink-0 transition-transform ${showPanel ? 'rotate-180' : ''}`} />
       </button>
 
+      {/* Build-Karte: ein Fremd-Build läuft — ersetzt den Update-Button,
+          denn ein Update-Klick würde jetzt ohnehin nur vorgemerkt. */}
+      {buildPct !== null && !showPanel && (
+        <div className="mx-3 mt-1 px-3 py-2 w-[calc(100%-1.5rem)] rounded-lg text-xs font-medium text-[#2563eb] bg-secondary border border-[#bfdbfe]">
+          <div className="flex items-center gap-2">
+            <IconRefresh size={13} className="shrink-0 animate-spin [animation-direction:reverse] motion-reduce:animate-none" />
+            <span className="flex-1 min-w-0">{t('vc_build_pill')}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Fehlerzustand: ein beobachteter Build ist gescheitert — die
+          Änderung ist NICHT im Dashboard. Verschwindet mit dem nächsten
+          Build-Start. */}
+      {buildFailed && buildPct === null && !showPanel && (
+        <div className="mx-3 mt-1 px-3 py-1.5 w-[calc(100%-1.5rem)] rounded-lg text-xs text-destructive bg-destructive/10">
+          {t('vc_build_failed')}
+        </div>
+      )}
+
       {/* Update banner */}
-      {updateAvailable && !showPanel && (
+      {updateAvailable && !showPanel && buildPct === null && (
         <button
           onClick={() => setUpdateDialogOpen(true)}
           className="flex items-center gap-2 mx-3 mt-1 px-3 py-1.5 w-[calc(100%-1.5rem)] rounded-lg text-xs font-medium text-[#2563eb] bg-secondary border border-[#bfdbfe] hover:bg-[#dbeafe] transition-colors"
@@ -390,8 +589,19 @@ export function VersionCheck() {
 
         return (
         <div className="mx-3 mt-1 mb-2 rounded-xl border border-sidebar-border bg-sidebar overflow-hidden">
+          {/* Build-Karte im Panel: läuft ein Build, ist sie das oberste
+              Element und der Update-Button bleibt unterdrückt. */}
+          {buildPct !== null && !selectedBranch && (
+            <div className="w-full px-3 py-2 text-xs font-medium text-[#2563eb] bg-secondary/50 border-b border-sidebar-border">
+              <div className="flex items-center gap-2">
+                <IconRefresh size={13} className="shrink-0 animate-spin [animation-direction:reverse] motion-reduce:animate-none" />
+                <span className="flex-1 min-w-0">{t('vc_build_pill')}</span>
+              </div>
+            </div>
+          )}
+
           {/* Update button at top */}
-          {updateAvailable && !selectedBranch && (
+          {updateAvailable && !selectedBranch && buildPct === null && (
             <button
               onClick={() => setUpdateDialogOpen(true)}
               className="flex items-center gap-2 w-full px-3 py-2 text-xs font-medium text-[#2563eb] bg-secondary/50 hover:bg-secondary border-b border-sidebar-border transition-colors"
@@ -584,6 +794,12 @@ export function VersionCheck() {
       {status === 'error' && (
         <div className="mx-3 mt-1 px-3 py-1.5 text-xs text-destructive bg-destructive/10 rounded-lg">
           {statusMessage || t('vc_error_text')}
+        </div>
+      )}
+
+      {status === 'busy' && (
+        <div className="mx-3 mt-1 px-3 py-1.5 text-xs text-[#2563eb] bg-secondary border border-[#bfdbfe] rounded-lg">
+          {t('update_busy_queued', { min: busyAgeMin })}
         </div>
       )}
 

@@ -22,6 +22,8 @@ const MANIFEST = '.components-manifest.json';
 const FORBIDDEN = [
   '@/services/livingAppsService',
   '@/lib/publicClient',
+  // module no longer exists (assistant moved into <la-klar-assistant>) — kept so
+  // stale copies in updated old repos can never sneak back in
   '@/lib/actions-agent',
   '@/hooks/useDashboardData',
   '@/lib/enrich',

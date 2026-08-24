@@ -98,7 +98,11 @@ export function IntentWizardShell({
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
       <div>
-        {back !== false && (
+        {/* The default back target is the DASHBOARD — on a public route an
+            anonymous visitor has no session there, so the shell suppresses
+            its default itself instead of relying on every public page to
+            remember `back={false}`. An explicit `back` object still wins. */}
+        {back !== false && (back || !window.location.hash.startsWith('#/public')) && (
           <a href={back?.href ?? '#/'} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-2">
             <IconArrowLeft size={14} className="shrink-0" />
             {back?.label ?? t('wizard_back_to_dashboard')}
@@ -108,11 +112,16 @@ export function IntentWizardShell({
         {subtitle && <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>}
       </div>
 
-      {/* Step Indicator */}
-      <div className="flex items-center gap-0">
+      {/* Step Indicator — a symmetric META element, so it centers as a
+          compact group (fixed connectors, no stretching). The CONTENT column
+          around it (title, description, fields) stays on the left reading
+          axis — do not center those. The old layout gave every step flex-1
+          but the last one had no connector to fill it, so the group hung
+          visibly off to the left. */}
+      <div className="flex items-start justify-center">
         {steps.map((step, idx) => (
-          <div key={idx} className="flex items-center flex-1 min-w-0">
-            <div className="flex flex-col items-center gap-1">
+          <div key={idx} className="flex items-start min-w-0">
+            <div className="flex flex-col items-center gap-1 min-w-0">
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 transition-colors ${
                   idx + 1 < currentStep
@@ -124,14 +133,15 @@ export function IntentWizardShell({
               >
                 {idx + 1 < currentStep ? <IconCheck size={14} stroke={2.5} /> : idx + 1}
               </div>
-              <span className={`text-xs font-medium whitespace-nowrap hidden sm:block ${
+              <span className={`text-xs font-medium whitespace-nowrap hidden sm:block px-1 ${
                 idx + 1 === currentStep ? 'text-primary' : 'text-muted-foreground'
               }`}>
                 {step.label}
               </span>
             </div>
             {idx < steps.length - 1 && (
-              <div className={`h-0.5 flex-1 mx-2 mb-5 transition-colors ${
+              /* h-0.5 line vertically centered on the 32px dot: (32-2)/2 */
+              <div className={`h-0.5 w-6 sm:w-12 mt-[15px] mx-1.5 shrink-0 transition-colors ${
                 idx + 1 < currentStep ? 'bg-primary' : 'bg-muted'
               }`} />
             )}

@@ -8,6 +8,12 @@ import { lookupLabel } from '@/i18n';
 // AUTOMATICALLY GENERATED TYPES - DO NOT EDIT
 
 export type LookupValue = { key: string; label: string };
+/** A raw record URL (applookup reference). NEVER render this directly
+ *  in JSX — it is a URL, not a display value. Show the enriched `*Name`
+ *  field or resolve it via the entity map instead. Assignable to/from
+ *  string everywhere; the `& {}` keeps the alias NAME visible in tsc
+ *  error messages (a plain primitive alias gets normalized away). */
+export type RecordUrl = string & {};
 export type GeoLocation = { lat: number; long: number; info?: string };
 
 export type AttachmentType = 'file' | 'note' | 'url' | 'json';
@@ -60,7 +66,7 @@ export interface Aufgaben {
   createdat: string;
   updatedat: string | null;
   fields: {
-    projekt?: string; // applookup -> URL zu 'Projekte' Record
+    projekt?: RecordUrl; // applookup -> URL zu 'Projekte' Record
     titel?: string;
     aufgabe_beschreibung?: string;
     prioritaet?: LookupValue;
@@ -585,9 +591,8 @@ export class LivingAppsService {
 import '@/lib/sentry';
 import '@/lib/stale-bundle';
 import { Fragment, lazy, Suspense, useEffect, useState } from 'react';
-import { HashRouter, Routes, Route } from 'react-router-dom';
+import { HashRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { locale, onLocaleChange, syncProfileLocale } from '@/i18n';
-import { ActionsProvider } from '@/context/ActionsContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ErrorBusProvider } from '@/components/ErrorBus';
 import { Layout } from '@/components/Layout';
@@ -599,6 +604,8 @@ import ProjekteDetailPage from '@/pages/ProjekteDetailPage';
 import AufgabenPage from '@/pages/AufgabenPage';
 import AufgabenDetailPage from '@/pages/AufgabenDetailPage';
 // <custom:imports>
+const IntentProjektStartenPage = lazy(() => import('@/pages/intents/ProjektStartenPage'));
+const IntentAufgabeErledigePage = lazy(() => import('@/pages/intents/AufgabeErledigePage'));
 // </custom:imports>
 
 // Lazy: public pages live outside <Layout> and only load on /#/public/:slug —
@@ -606,9 +613,8 @@ import AufgabenDetailPage from '@/pages/AufgabenDetailPage';
 const PublicPage = lazy(() => import('@/pages/public/PublicPage'));
 
 // Language switch = full remount below the router: every t()/label lookup
-// re-evaluates, the la-* widgets re-read <html lang>. Sits INSIDE
-// ActionsProvider so chat/drawer state survives a switch, and inside
-// HashRouter so the current route survives (it re-reads the URL hash).
+// re-evaluates, the la-* widgets re-read <html lang>. Sits inside HashRouter
+// so the current route survives (it re-reads the URL hash).
 function LocaleGate({ children }: { children: React.ReactNode }) {
   // The i18n layer notifies for locale CHANGES and for catalog/overlay
   // ARRIVALS (same locale, new data). `setCurrent(locale)` bailed out on
@@ -627,12 +633,27 @@ function LocaleGate({ children }: { children: React.ReactNode }) {
   return <Fragment key={`${locale}:${gen}`}>{children}</Fragment>;
 }
 
+const APPGROUP_ID = '6a60ac20ef6642d43053c81c';
+
+// The assistant (chat + Werkzeuge + code viewer) is platform chrome:
+// <la-klar-assistant>, loaded via /actions-agent/embed/embed.js (appended
+// dynamically in index.html). Own shadow DOM, own styling. Mounted OUTSIDE
+// LocaleGate on purpose — its keyed remounts (locale switch, catalog
+// arrival) must not tear the element down mid-chat; the element follows
+// <html lang> itself. Hidden on anonymous public routes; its 401 guard is
+// the backstop, not the mechanism.
+function AssistantMount() {
+  const location = useLocation();
+  if (location.pathname.startsWith('/public')) return null;
+  return <la-klar-assistant appgroup-id={APPGROUP_ID} />;
+}
+
 export default function App() {
   return (
     <ErrorBoundary>
       <ErrorBusProvider>
         <HashRouter>
-          <ActionsProvider>
+            <AssistantMount />
             <LocaleGate>
             <Routes>
               <Route path="public/:slug" element={<Suspense fallback={null}><PublicPage /></Suspense>} />
@@ -645,11 +666,12 @@ export default function App() {
                 <Route path="admin" element={<AdminPage />} />
                 <Route path="verwaltung/oeffentliche-seiten" element={<PublicPagesAdmin />} />
                 {/* <custom:routes> */}
+                <Route path="intents/projekt-starten" element={<Suspense fallback={null}><IntentProjektStartenPage /></Suspense>} />
+                <Route path="intents/aufgabe-erledigen" element={<Suspense fallback={null}><IntentAufgabeErledigePage /></Suspense>} />
                 {/* </custom:routes> */}
               </Route>
             </Routes>
             </LocaleGate>
-          </ActionsProvider>
         </HashRouter>
       </ErrorBusProvider>
     </ErrorBoundary>
@@ -663,13 +685,9 @@ export default function App() {
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { IconAlertCircle } from '@tabler/icons-react';
 import { useState, useEffect, useRef } from 'react';
-import ChatWidget from '@/components/ChatWidget';
-import { ActionCodeDrawer } from '@/components/ActionCodeDrawer';
-import { ActionInputDialog } from '@/components/ActionInputDialog';
 import { ActionsSidebar } from '@/components/ActionsSidebar';
 import { IntentsNav } from '@/components/IntentsNav';
 import { PublicPagesNav } from '@/components/PublicPagesNav';
-import { useActions } from '@/context/ActionsContext';
 import { Button } from '@/components/ui/button';
 import { VersionCheck } from '@/components/VersionCheck';
 // Sprachwechsel kommt aus der Plattform-Topnav: sie schreibt <html lang>,
@@ -684,7 +702,6 @@ const IS_EMBED = new URLSearchParams(window.location.search).has('embed') || win
 export function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { inputFormAction, inputFormOptions, submitActionInputs, cancelInputForm } = useActions();
   const [authError, setAuthError] = useState(false);
   const drawerRef = useRef<HTMLElement>(null);
   const dashboardLinkRef = useRef<HTMLElement>(null);
@@ -801,7 +818,8 @@ export function Layout() {
           {/* Aktionen-Sektion (Figma-Muster): alles, was man TUN kann —
               Abläufe und Öffentliche Seiten als aufklappbare Gruppen
               (starten zu), Werkzeuge als schlichter Eintrag (öffnet den
-              ActionsDrawer), dann die Version als Meta-Zeile. Klar Lab und
+              Werkzeuge-Drawer des Assistenten), dann die Version als
+              Meta-Zeile. Klar Lab und
               die Entwickler/Beta-Toggles stecken im Versions-Panel. */}
           <la-nav-section type="secondary" label={t('actions_section')}>
             <IntentsNav />
@@ -842,18 +860,9 @@ export function Layout() {
         </main>
       </div>
 
-      <ChatWidget />
-      <ActionCodeDrawer />
-
-      {inputFormAction && inputFormAction.metadata?.input_schema && (
-        <ActionInputDialog
-          action={inputFormAction}
-          schema={inputFormAction.metadata.input_schema}
-          options={inputFormOptions}
-          onSubmit={(inputs, files) => submitActionInputs(inputFormAction, inputs, files)}
-          onCancel={cancelInputForm}
-        />
-      )}
+      {/* The assistant element (<la-klar-assistant>) mounts in App.tsx,
+          OUTSIDE LocaleGate — its keyed remounts must not tear the element
+          down mid-chat. */}
     </div>
   );
 }
@@ -916,8 +925,12 @@ export function useDashboardData() {
       }
     }
     function handleRefresh() { void silentRefresh(); }
-    window.addEventListener('dashboard-refresh', handleRefresh);
-    return () => window.removeEventListener('dashboard-refresh', handleRefresh);
+    // assistant:data-changed comes from the assistant (<la-klar-assistant>)
+    // after every mutation. The element additionally fires the legacy
+    // dashboard-refresh event for OLD deployed bundles — do NOT subscribe to
+    // both here, or every mutation fetches twice.
+    window.addEventListener('assistant:data-changed', handleRefresh);
+    return () => window.removeEventListener('assistant:data-changed', handleRefresh);
   }, []);
 
   const projekteMap = useMemo(() => {
