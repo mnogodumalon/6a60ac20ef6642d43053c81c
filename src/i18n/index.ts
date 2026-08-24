@@ -435,6 +435,9 @@ export const UI_CATALOG: Record<CoreLocale, Record<string, string>> = {
     "polish_greeting_morning": "Guten Morgen!",
     "polish_greeting_day": "Guten Tag!",
     "polish_greeting_evening": "Guten Abend!",
+    "polish_greeting_morning_named": "Guten Morgen, {name}!",
+    "polish_greeting_day_named": "Guten Tag, {name}!",
+    "polish_greeting_evening_named": "Guten Abend, {name}!",
     "polish_undo": "Rückgängig",
     "attachments_upload_failed": "Datei konnte nicht hochgeladen werden.",
     "scan_error": "Scan fehlgeschlagen",
@@ -833,6 +836,9 @@ export const UI_CATALOG: Record<CoreLocale, Record<string, string>> = {
     "polish_greeting_morning": "Good morning!",
     "polish_greeting_day": "Good afternoon!",
     "polish_greeting_evening": "Good evening!",
+    "polish_greeting_morning_named": "Good morning, {name}!",
+    "polish_greeting_day_named": "Good afternoon, {name}!",
+    "polish_greeting_evening_named": "Good evening, {name}!",
     "polish_undo": "Undo",
     "attachments_upload_failed": "File could not be uploaded.",
     "scan_error": "Scan failed",
@@ -1131,6 +1137,20 @@ if (typeof MutationObserver !== 'undefined') {
   }).observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] });
 }
 
+// The /user response fetched below also carries the profile's first name —
+// captured for the personalized greeting (gruss() in @/lib/polish). Stays
+// null for anonymous/offline visitors and on public routes (which never call
+// syncProfileLocale), so consumers must always have a nameless fallback.
+let firstname: string | null = null;
+const firstnameListeners = new Set<() => void>();
+export function profileFirstname(): string | null {
+  return firstname;
+}
+export function onProfileFirstname(fn: () => void): () => void {
+  firstnameListeners.add(fn);
+  return () => firstnameListeners.delete(fn);
+}
+
 // The LA profile is the language's source of truth AT REST: adopt it once
 // per page load (LocaleGate calls this on mount). It must NOT re-run on the
 // remount a language switch causes — that reverted every header-switcher
@@ -1144,7 +1164,11 @@ export async function syncProfileLocale(): Promise<void> {
   try {
     const r = await fetch(`${LA_API_URL}/user`, { credentials: 'include' });
     if (!r.ok) return;
-    const raw = (await r.json()) as { lang?: unknown };
+    const raw = (await r.json()) as { lang?: unknown; firstname?: unknown };
+    if (typeof raw?.firstname === 'string' && raw.firstname.trim()) {
+      firstname = raw.firstname.trim();
+      firstnameListeners.forEach((fn) => fn());
+    }
     const lang = normalizeLang(typeof raw?.lang === 'string' ? raw.lang : null);
     if (!lang) return;
     // A switch that happened while we fetched wins over the profile.
