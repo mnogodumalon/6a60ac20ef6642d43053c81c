@@ -2,7 +2,7 @@
   "pages": {
     "en": {
       "Abschlussnotiz": "Completion note",
-      "Alle Aufgaben erledigt — super gemacht!": "All tasks completed — great job!",
+      "Alle Aufgaben erledigt — super gemacht!": "All tasks done — great job!",
       "Alle offenen Aufgaben": "All Open Tasks",
       "Als erledigt markieren": "Mark as Done",
       "Aufgabe": "Task",
@@ -39,7 +39,7 @@
       "Hoch": "High",
       "Hochprioritäre Aufgaben": "High-Priority Tasks",
       "In Bearbeitung": "In Progress",
-      "In Bearbeitung setzen": "Set to In Progress",
+      "In Bearbeitung setzen": "Set In Progress",
       "Keine hochprioritären Aufgaben — alles auf Kurs!": "No high-priority tasks — everything on track!",
       "Keine offenen oder in Bearbeitung befindlichen Aufgaben": "No open or in-progress tasks",
       "Kurze Beschreibung des Projekts, Ziele, Hintergrund …": "Brief description of the project, goals, background …",
@@ -55,7 +55,7 @@
       "Offen": "Open",
       "Offene Aufgabe auswählen und als erledigt markieren": "Select an open task and mark it as done",
       "Offene Aufgaben": "Open Tasks",
-      "Ohne Aufgaben abschließen": "Finish without Tasks",
+      "Ohne Aufgaben abschließen": "Finish Without Tasks",
       "Ohne Name": "Unnamed",
       "Ohne Titel": "Untitled",
       "Priorität": "Priority",

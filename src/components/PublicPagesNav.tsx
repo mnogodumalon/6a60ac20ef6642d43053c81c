@@ -85,9 +85,9 @@ export function PublicPagesNav({ onNavigate }: { onNavigate?: () => void }) {
           {t('ppn_manage_label')}
         </NavLink>
       </div>
-      {/* Page rows sit one hierarchy level below the peer section heading:
-          pl-8 matches a primary nav-section body; px-2 matches its rows. */}
-      <div className="space-y-0.5 pl-8">
+      {/* The leading icons share the section heading's px-2 gutter; titles
+          receive their hierarchy naturally from the icon and gap. */}
+      <div className="space-y-0.5">
         {entries.map(entry => (
           <div key={entry.slug} className="group flex items-center min-w-0">
             <a

@@ -606,6 +606,10 @@ import AufgabenDetailPage from '@/pages/AufgabenDetailPage';
 // <custom:imports>
 const IntentProjektStartenPage = lazy(() => import('@/pages/intents/ProjektStartenPage'));
 const IntentAufgabeErledigePage = lazy(() => import('@/pages/intents/AufgabeErledigePage'));
+
+
+
+
 // </custom:imports>
 
 // Lazy: public pages live outside <Layout> and only load on /#/public/:slug —
