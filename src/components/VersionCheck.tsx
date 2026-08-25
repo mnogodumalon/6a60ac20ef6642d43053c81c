@@ -510,7 +510,7 @@ export function VersionCheck() {
         : t('rolling_back');
     const Icon = status === 'rolling_back' ? IconHistory : IconRefresh;
     return (
-      <div className="flex items-center gap-2 px-4 py-2 text-xs text-muted-foreground">
+      <div className="flex items-center gap-2 px-2 py-2 text-xs text-muted-foreground">
         <Icon size={14} className="shrink-0 animate-spin [animation-direction:reverse]" />
         <span>{label}</span>
       </div>
@@ -526,7 +526,7 @@ export function VersionCheck() {
           setShowPanel(next);
           if (next) loadDeployments();
         }}
-        className="flex items-center justify-between gap-2 w-full px-4 py-2 text-left text-xs text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-sidebar-accent/30"
+        className="flex items-center justify-between gap-2 w-full px-2 py-2 text-left text-xs text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-sidebar-accent/30"
       >
         <span className="flex items-center gap-1.5">
           <IconClock size={13} className="shrink-0" />
