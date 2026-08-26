@@ -178,6 +178,17 @@ export function ErrorBusProvider({ children }: { children: ReactNode }) {
     };
     const onRejection = (e: PromiseRejectionEvent) => {
       const reason: unknown = e.reason;
+      // Aborted work is not failure. React 19's Navigation-API integration
+      // runs view transitions the browser may skip (reload mid-flight,
+      // rapid navigation) — the promise rejects with `AbortError:
+      // Transition was skipped`, uncaught by React. lib/sentry.ts filters
+      // this for the REPORT channel; this is the TOAST channel and needs
+      // its own filter, otherwise every skipped animation toasts a bug.
+      // Cancelled fetches reject with AbortError too — same verdict.
+      if (
+        (reason instanceof DOMException && reason.name === 'AbortError') ||
+        (reason instanceof Error && reason.message.includes('Transition was skipped'))
+      ) return;
       const message =
         reason instanceof Error ? reason.message :
         typeof reason === 'string' ? reason :

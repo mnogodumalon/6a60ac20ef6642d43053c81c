@@ -36,6 +36,13 @@
 //      unparenthesized with `||`/`&&`. Fix: parenthesize the mixed child of
 //      the flagged expression AS TSC PARSED IT — zero semantic change, the
 //      grammar error disappears.
+//   G. TS2783 `{ schichttypId, bereich, ...plan }` — a property written
+//      BEFORE a spread that provably carries the same key; the spread wins,
+//      the explicit member is dead code (live: a fan-out intent page passed
+//      its own gate and turned the i18n rebuild red). Fix: drop the flagged
+//      member — zero semantic change. Only when its value cannot have side
+//      effects (identifier, member chain, literal, shorthand); a call or
+//      `await` there stays for the agent.
 //
 // A/B only apply when the property PROVABLY exists at the target (parsed
 // from the generated src/types/app.ts + src/types/enriched.ts) — no
@@ -127,6 +134,7 @@ const NULL_RE = /^(.+?)\((\d+),(\d+)\): error TS2322: Type '(.+?)' is not assign
 const CMP_RE = /^(.+?)\((\d+),(\d+)\): error TS2367: This comparison appears to be unintentional because the types '(.+?)' and '(.+?)' have no overlap\.$/;
 const JSX_RE = /^(.+?)\((\d+),(\d+)\): error TS2503: Cannot find namespace 'JSX'\.$/;
 const MIX_RE = /^(.+?)\((\d+),(\d+)\): error TS5076: '(?:\|\||&&|\?\?)' and '(?:\|\||&&|\?\?)' operations cannot be mixed without parentheses\.$/;
+const DUP_RE = /^(.+?)\((\d+),(\d+)\): error TS2783: '(.+?)' is specified more than once, so this usage will be overwritten\.$/;
 
 /** Discriminant spellings compare equal once `_` and case are dropped. */
 function normKey(s) {
@@ -139,6 +147,7 @@ function parseErrors(output) {
   const cmpErrors = [];
   const jsxErrors = [];
   const mixErrors = [];
+  const dupErrors = [];
   let total = 0;
   for (const line of output.split('\n')) {
     const trimmed = line.trim();
@@ -146,6 +155,11 @@ function parseErrors(output) {
     const j = trimmed.match(JSX_RE);
     if (j) {
       jsxErrors.push({ file: j[1], line: Number(j[2]), col: Number(j[3]) });
+      continue;
+    }
+    const d = trimmed.match(DUP_RE);
+    if (d) {
+      dupErrors.push({ file: d[1], line: Number(d[2]), col: Number(d[3]), prop: d[4] });
       continue;
     }
     const x = trimmed.match(MIX_RE);
@@ -186,7 +200,7 @@ function parseErrors(output) {
       }
     }
   }
-  return { errors, nullErrors, cmpErrors, jsxErrors, mixErrors, total };
+  return { errors, nullErrors, cmpErrors, jsxErrors, mixErrors, dupErrors, total };
 }
 
 // ── Fixes ───────────────────────────────────────────────────────────
@@ -315,6 +329,54 @@ function findMixedChild(sf, line) {
   return found;
 }
 
+// Class G: the object-literal member named `prop` on `line` that a LATER
+// spread in the same literal overwrites (that is what TS2783 asserts — the
+// spread's type carries the key as required). Returns null unless the member
+// is side-effect free, so dropping it changes nothing but the diagnostic.
+function isPureValue(n) {
+  if (!n) return false;
+  if (ts.isParenthesizedExpression(n) || ts.isAsExpression(n) || ts.isNonNullExpression(n)) {
+    return isPureValue(n.expression);
+  }
+  if (ts.isIdentifier(n) || n.kind === ts.SyntaxKind.ThisKeyword) return true;
+  if (
+    ts.isStringLiteral(n) || ts.isNumericLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n) ||
+    n.kind === ts.SyntaxKind.TrueKeyword || n.kind === ts.SyntaxKind.FalseKeyword ||
+    n.kind === ts.SyntaxKind.NullKeyword
+  ) return true;
+  if (ts.isPropertyAccessExpression(n)) return isPureValue(n.expression);
+  if (ts.isElementAccessExpression(n)) {
+    return isPureValue(n.expression) && isPureValue(n.argumentExpression);
+  }
+  return false;
+}
+function findOverwrittenProperty(sf, line, prop) {
+  let found = null;
+  const visit = (n) => {
+    if (found) return;
+    if (
+      (ts.isPropertyAssignment(n) || ts.isShorthandPropertyAssignment(n)) &&
+      n.name.getText(sf) === prop &&
+      ts.isObjectLiteralExpression(n.parent) &&
+      sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1 === line
+    ) {
+      const props = n.parent.properties;
+      const idx = props.indexOf(n);
+      const spreadAfter = props.slice(idx + 1).some((p) => ts.isSpreadAssignment(p));
+      const pure = ts.isShorthandPropertyAssignment(n) || isPureValue(n.initializer);
+      if (spreadAfter && pure && idx < props.length - 1) {
+        // Remove up to the next member's start — takes the comma and the
+        // whitespace with it, whatever the formatting.
+        found = { start: n.getStart(sf), end: props[idx + 1].getStart(sf) };
+      }
+      return;
+    }
+    ts.forEachChild(n, visit);
+  };
+  visit(sf);
+  return found;
+}
+
 function findAccess(sf, line, prop) {
   let found = null;
   const visit = (n) => {
@@ -397,7 +459,7 @@ function dropUnusedImport(src, name, filePath) {
   return src;
 }
 
-function healFile(filePath, errors, nullErrors, cmpErrors, jsxErrors, mixErrors, shapes) {
+function healFile(filePath, errors, nullErrors, cmpErrors, jsxErrors, mixErrors, dupErrors, shapes) {
   const before = readFileSync(filePath, 'utf8');
   const sf = ts.createSourceFile(
     filePath, before, ts.ScriptTarget.Latest, true,
@@ -417,6 +479,14 @@ function healFile(filePath, errors, nullErrors, cmpErrors, jsxErrors, mixErrors,
     edits.push({ start: node.getStart(sf), end: node.getEnd(), text: 'React.ReactElement' });
     needReact = true;
     fixed.push({ file: filePath, line: err.line, kind: 'jsx-to-react-element' });
+  }
+
+  // Class G: drop the member a later spread overwrites anyway.
+  for (const err of dupErrors) {
+    const span = findOverwrittenProperty(sf, err.line, err.prop);
+    if (!span) continue;
+    edits.push({ start: span.start, end: span.end, text: '' });
+    fixed.push({ file: filePath, line: err.line, kind: 'drop-overwritten-property', prop: err.prop });
   }
 
   // Class F: parenthesize the mixed `??`/`||`/`&&` child as parsed.
@@ -541,7 +611,7 @@ const shapes = {
 
 const files = new Set(
   [...parsed.errors, ...parsed.nullErrors, ...parsed.cmpErrors,
-   ...parsed.jsxErrors, ...parsed.mixErrors].map((e) => e.file),
+   ...parsed.jsxErrors, ...parsed.mixErrors, ...parsed.dupErrors].map((e) => e.file),
 );
 const fixed = [];
 for (const file of files) {
@@ -554,6 +624,7 @@ for (const file of files) {
       parsed.cmpErrors.filter((e) => e.file === file),
       parsed.jsxErrors.filter((e) => e.file === file),
       parsed.mixErrors.filter((e) => e.file === file),
+      parsed.dupErrors.filter((e) => e.file === file),
       shapes,
     ));
   } catch (e) {

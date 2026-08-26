@@ -68,3 +68,6 @@ export function useDashboardData() {
 
   return { projekte, setProjekte, aufgaben, setAufgaben, loading, error, fetchAll, projekteMap };
 }
+
+/** The hook's return — the `data` prop of DashboardOverview in the Ready-Wrapper form. */
+export type DashboardData = ReturnType<typeof useDashboardData>;

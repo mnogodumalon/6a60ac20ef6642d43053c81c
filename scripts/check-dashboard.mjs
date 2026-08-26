@@ -6,7 +6,7 @@
  * non-zero with actionable messages; fix every ERROR and re-run until green.
  * Text-based on purpose: cheap, deterministic, no AST dependency.
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 
 const FILE = 'src/pages/DashboardOverview.tsx';
 let src;
@@ -317,18 +317,41 @@ if (gridIdx >= 0) {
   }
 }
 
-// 20. Loading/error surfaces are pre-generated (incl. the self-repair flow) —
-// the overview imports them and keeps the two early-returns; a local rebuild
-// drifts from the repair protocol and re-types ~120 lines every build.
+// 20. Loading/error surfaces are pre-generated (incl. the self-repair flow).
+// TWO page shapes, told apart by the generator-owned DashboardReady.tsx:
+//   ready  — src/pages/DashboardReady.tsx exists: IT runs useDashboardData()
+//            and the two surfaces, then mounts this page with `data` as a
+//            prop. Calling the hook here again fetches everything twice and
+//            re-mounts the loading/error early-return — the React #310 trap
+//            the wrapper removed.
+//   legacy — no wrapper file: the page calls the hook itself and keeps the
+//            two early-returns with the pre-generated surfaces.
+// Either way a local rebuild drifts from the repair protocol and re-types
+// ~120 lines every build.
 {
-  if (!/import\s*\{[^}]*\bDashboard(?:Skeleton|Error)\b[^}]*\}\s*from\s*'@\/components\/DashboardStates'/.test(code)) {
-    errors.push("DashboardSkeleton/DashboardError not imported from '@/components/DashboardStates' — they are pre-generated; import them, do not rebuild them.");
-  }
-  if (!code.includes('<DashboardSkeleton')) {
-    errors.push("<DashboardSkeleton/> early-return missing — keep `if (loading) return <DashboardSkeleton />;` before any data access.");
-  }
-  if (!code.includes('<DashboardError')) {
-    errors.push("<DashboardError/> early-return missing — keep `if (error) return <DashboardError error={error} onRetry={fetchAll} />;`.");
+  const readyWrapper = existsSync('src/pages/DashboardReady.tsx');
+  const HOOK_CALL_RE = /\buseDashboardData\s*\(/;
+  const EARLY_RETURN_RE = /if\s*\(\s*(?:loading|error)\s*\)\s*return\b/;
+  if (readyWrapper) {
+    if (HOOK_CALL_RE.test(code)) {
+      errors.push("useDashboardData() called although DashboardReady.tsx already loads the data — this page receives it as a prop: `export default function DashboardOverview({ data }: { data: DashboardData })` (type from '@/hooks/useDashboardData'). Delete the hook call and the loading/error early-returns." + quoteLines(HOOK_CALL_RE));
+    }
+    if (EARLY_RETURN_RE.test(code)) {
+      errors.push("loading/error early-return found — DashboardReady.tsx handles both BEFORE this page mounts; the data is loaded. Delete the branch and keep every hook unconditional." + quoteLines(EARLY_RETURN_RE));
+    }
+    if (!/function\s+DashboardOverview\s*\(\s*\{[^}]*\bdata\b/.test(code)) {
+      errors.push("DashboardOverview must take the loaded data as a prop — `export default function DashboardOverview({ data }: { data: DashboardData })` — DashboardReady.tsx passes it in; without the prop the page has nothing to render.");
+    }
+  } else {
+    if (!/import\s*\{[^}]*\bDashboard(?:Skeleton|Error)\b[^}]*\}\s*from\s*'@\/components\/DashboardStates'/.test(code)) {
+      errors.push("DashboardSkeleton/DashboardError not imported from '@/components/DashboardStates' — they are pre-generated; import them, do not rebuild them.");
+    }
+    if (!code.includes('<DashboardSkeleton')) {
+      errors.push("<DashboardSkeleton/> early-return missing — keep `if (loading) return <DashboardSkeleton />;` before any data access.");
+    }
+    if (!code.includes('<DashboardError')) {
+      errors.push("<DashboardError/> early-return missing — keep `if (error) return <DashboardError error={error} onRetry={fetchAll} />;`.");
+    }
   }
   if (/(?:function|const)\s+Dashboard(?:Skeleton|Error)\b/.test(code)) {
     errors.push("Local DashboardSkeleton/DashboardError definition found — these ship in '@/components/DashboardStates'; delete the local copy and import them.");
@@ -362,6 +385,21 @@ if (gridIdx >= 0) {
     }
   } else if (ENTITY_DIALOG_PASCALS.length > 0 && !src.includes('crud-opt-out:')) {
     warnings.push("Page does not use useEntityCrud() — new pages compose the pre-generated CRUD plumbing (crud.<entity>.openCreate/openEdit/openDetail + {crud.surfaces}); hand-rolling it costs ~150 lines per write. A conscious exception needs a // crud-opt-out: <reason> comment. (Preserved legacy pages: ignore, this is a warning by design.)");
+  }
+}
+
+// 24. No dynamic import() of first-party modules. The app is one bundle;
+// `await import('@/services/livingAppsService').then(({ LivingAppsService }) => …)`
+// buys nothing and makes Vite print "dynamically imported … but also
+// statically imported" — a WARNING on a green build, which an agent then
+// "repaired" with two edits and a second full build cycle (live: +40s).
+// Every '@/…' module is a plain static import (the skeleton already imports
+// LivingAppsService from the service module); lazy chunks belong to the
+// scaffold (App.tsx routes, MapWidget's leaflet), never to this page.
+{
+  const DYN_IMPORT_RE = /\bimport\s*\(\s*['"](?:@\/|\.{1,2}\/)/;
+  if (DYN_IMPORT_RE.test(code)) {
+    errors.push("Dynamic import() of a first-party module — the app is one bundle, Vite only warns about the mixed static/dynamic import and the code gains nothing. Add the name to the static import at the top of the file (the skeleton already imports LivingAppsService, extractRecordId, createRecordUrl from '@/services/livingAppsService') and call it directly." + quoteLines(DYN_IMPORT_RE));
   }
 }
 

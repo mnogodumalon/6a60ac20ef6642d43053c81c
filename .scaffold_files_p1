@@ -608,6 +608,10 @@ import AufgabenDetailPage from '@/pages/AufgabenDetailPage';
 // <custom:imports>
 const IntentProjektStartenPage = lazy(() => import('@/pages/intents/ProjektStartenPage'));
 const IntentAufgabeErledigePage = lazy(() => import('@/pages/intents/AufgabeErledigePage'));
+
+
+
+
 // </custom:imports>
 
 // Lazy: public pages live outside <Layout> and only load on /#/public/:slug —
@@ -817,7 +821,7 @@ export function Layout() {
             </la-nav-section>
           </la-nav-section>
 
-          {/* Aktionen-Sektion (Figma-Muster): alles, was man TUN kann —
+          {/* Produktivitäts-Sektion (Figma-Muster): zusätzliche Funktionen —
               Abläufe und Öffentliche Seiten als aufklappbare Gruppen
               (starten zu), Werkzeuge als schlichter Eintrag (öffnet den
               Werkzeuge-Drawer des Assistenten), dann die Version als
@@ -834,7 +838,7 @@ export function Layout() {
 
           {/* Sticky Footer = dünne Meta-Zeile (Figma-Muster). Relative
               Pfade, damit die Plattform-Seiten auf jedem Host stimmen. */}
-          <div slot="footer" className="flex flex-wrap gap-x-4 gap-y-1 border-t border-sidebar-border py-3 text-sm font-medium text-muted-foreground">
+          <div slot="footer" className="flex flex-wrap justify-center gap-x-4 gap-y-1 border-t border-sidebar-border py-3 text-sm font-medium text-muted-foreground">
             <a href="/impressum.htm" className="hover:text-foreground transition-colors">{t('legal_imprint')}</a>
             <a href="/datenschutz.htm" className="hover:text-foreground transition-colors">{t('legal_privacy')}</a>
             <a href="/apps.htm" className="hover:text-foreground transition-colors">LivingApps</a>
@@ -943,6 +947,9 @@ export function useDashboardData() {
 
   return { projekte, setProjekte, aufgaben, setAufgaben, loading, error, fetchAll, projekteMap };
 }
+
+/** The hook's return — the `data` prop of DashboardOverview in the Ready-Wrapper form. */
+export type DashboardData = ReturnType<typeof useDashboardData>;
 ```
 
 ## src/lib/enrich.ts

@@ -131,7 +131,7 @@ export function Layout() {
             </la-nav-section>
           </la-nav-section>
 
-          {/* Aktionen-Sektion (Figma-Muster): alles, was man TUN kann —
+          {/* Produktivitäts-Sektion (Figma-Muster): zusätzliche Funktionen —
               Abläufe und Öffentliche Seiten als aufklappbare Gruppen
               (starten zu), Werkzeuge als schlichter Eintrag (öffnet den
               Werkzeuge-Drawer des Assistenten), dann die Version als
@@ -148,7 +148,7 @@ export function Layout() {
 
           {/* Sticky Footer = dünne Meta-Zeile (Figma-Muster). Relative
               Pfade, damit die Plattform-Seiten auf jedem Host stimmen. */}
-          <div slot="footer" className="flex flex-wrap gap-x-4 gap-y-1 border-t border-sidebar-border py-3 text-sm font-medium text-muted-foreground">
+          <div slot="footer" className="flex flex-wrap justify-center gap-x-4 gap-y-1 border-t border-sidebar-border py-3 text-sm font-medium text-muted-foreground">
             <a href="/impressum.htm" className="hover:text-foreground transition-colors">{t('legal_imprint')}</a>
             <a href="/datenschutz.htm" className="hover:text-foreground transition-colors">{t('legal_privacy')}</a>
             <a href="/apps.htm" className="hover:text-foreground transition-colors">LivingApps</a>
