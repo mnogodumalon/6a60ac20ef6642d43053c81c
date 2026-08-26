@@ -44,6 +44,7 @@
  */
 import { de as dfDe } from 'date-fns/locale';
 import type { Locale as DateFnsLocale } from 'date-fns';
+import { REST_URL } from '@/lib/origin';
 
 // Core = baked into the bundle. Locale stays an OPEN string type so overlay
 // languages added later never invalidate today's code (`string & {}` keeps
@@ -60,7 +61,7 @@ export const BUILD_LOCALE: CoreLocale = 'de';
 export const CURRENCY = 'EUR';
 
 const STORAGE_KEY = 'app-locale';
-const LA_API_URL = 'https://my.living-apps.de/rest';
+const LA_API_URL = REST_URL;
 
 // ── Generated catalogs ─────────────────────────────────────────────
 // UI chrome strings (generator UI_TEXTS, all core locales):
@@ -249,6 +250,8 @@ export const UI_CATALOG: Record<CoreLocale, Record<string, string>> = {
     "update_busy_queued": "Ein Build läuft gerade (gestartet vor {min} min). Das Update ist vorgemerkt und wird danach automatisch ausgeführt.",
     "busy_build_running": "Für dieses Dashboard läuft gerade ein Build. Bitte versuche es in ein paar Minuten erneut.",
     "vc_build_pill": "Deine Änderungen werden eingebaut",
+    "vc_build_initial": "Deine Anwendung wird fertig eingerichtet",
+    "vc_build_update": "Dashboard wird aktualisiert",
     "vc_build_failed": "Die letzte Aktualisierung ist fehlgeschlagen — deine Änderung ist noch nicht im Dashboard.",
     "vc_updated_toast": "Dashboard wurde aktualisiert",
     "vc_updated_toast_desc": "Die Struktur hat sich geändert — offene Formulare bitte neu öffnen.",
@@ -650,6 +653,8 @@ export const UI_CATALOG: Record<CoreLocale, Record<string, string>> = {
     "update_busy_queued": "A build is already running (started {min} min ago). The update is queued and will run automatically afterwards.",
     "busy_build_running": "A build is currently running for this dashboard. Please try again in a few minutes.",
     "vc_build_pill": "Building in your changes",
+    "vc_build_initial": "Finishing setting up your app",
+    "vc_build_update": "Dashboard is being updated",
     "vc_build_failed": "The last update failed — your change is not in the dashboard yet.",
     "vc_updated_toast": "Dashboard has been updated",
     "vc_updated_toast_desc": "The structure has changed — please reopen any open forms.",

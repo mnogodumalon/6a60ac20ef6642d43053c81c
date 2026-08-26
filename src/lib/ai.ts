@@ -1,6 +1,6 @@
 import { Sentry } from "./sentry";
+import { AI_ENDPOINT, HEIC_TO_URL } from "./origin";
 
-const AI_ENDPOINT = "https://my.living-apps.de/litellm/v1/chat/completions";
 const AI_MODEL = "default";
 
 export type ChatMessage = {
@@ -139,7 +139,7 @@ function loadHeicTo(): Promise<void> {
   if (heicToLoaded) return heicToLoaded;
   heicToLoaded = new Promise((resolve, reject) => {
     const s = document.createElement("script");
-    s.src = "https://my.living-apps.de/npm/heic-to/dist/iife/heic-to.js";
+    s.src = HEIC_TO_URL;
     s.onload = () => resolve();
     s.onerror = () => {
       heicToLoaded = null;

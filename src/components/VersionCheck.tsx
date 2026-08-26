@@ -207,10 +207,21 @@ export function VersionCheck() {
   // läuft, ERSETZT die Build-Karte den Update-Button — ein Klick würde
   // ohnehin nur im Ein-Platz-Slot vorgemerkt.
   const [buildPct, setBuildPct] = useState<number | null>(null);
+  const [buildKind, setBuildKind] = useState<string | null>(null);
   // Fehlerzustand nur für Builds, die WIR laufen sahen — ein uralter
   // failed-Stand in agent_states darf beim Seitenladen keine rote Karte
   // erzeugen. Verschwindet, sobald der nächste Build startet.
   const [buildFailed, setBuildFailed] = useState(false);
+
+  // Karten-Text nach Auslöser des Builds: "Deine Änderungen …" stimmt nur
+  // bei structure/prompt. Initial-Nachphasen und Versions-Updates bekommen
+  // eigene Texte; unbekannt/fehlend (älterer Server) fällt auf den
+  // NEUTRALEN Text zurück — der ist immer wahr, der persönliche nicht.
+  const buildPillText =
+    buildKind === 'structure' || buildKind === 'prompt' ? t('vc_build_pill')
+    : buildKind === 'initial' ? t('vc_build_initial')
+    : t('vc_build_update');
+
   const sawBuilding = useRef(false);
   const baselineRef = useRef<DeployedVersion | null>(null);
   const freshNotified = useRef(false);
@@ -311,9 +322,10 @@ export function VersionCheck() {
       try {
         const res = await fetch(AGENT_STATE_ENDPOINT, { credentials: 'include', cache: 'no-store' });
         if (!res.ok) throw new Error(String(res.status));
-        const state: { build_status?: string | null; build_pct?: number | null } = await res.json();
+        const state: { build_status?: string | null; build_pct?: number | null; build_kind?: string | null } = await res.json();
         if (state.build_status === 'building') {
           sawBuilding.current = true;
+          setBuildKind(state.build_kind ?? null);
           setBuildFailed(false);
           setBuildPct(typeof state.build_pct === 'number' ? state.build_pct : 0);
           next = BUILD_ACTIVE_POLL_MS;
@@ -542,7 +554,7 @@ export function VersionCheck() {
         <div className="mx-3 mt-1 px-3 py-2 w-[calc(100%-1.5rem)] rounded-lg text-xs font-medium text-[#2563eb] bg-secondary border border-[#bfdbfe]">
           <div className="flex items-center gap-2">
             <IconRefresh size={13} className="shrink-0 animate-spin [animation-direction:reverse] motion-reduce:animate-none" />
-            <span className="flex-1 min-w-0">{t('vc_build_pill')}</span>
+            <span className="flex-1 min-w-0">{buildPillText}</span>
           </div>
         </div>
       )}
@@ -595,7 +607,7 @@ export function VersionCheck() {
             <div className="w-full px-3 py-2 text-xs font-medium text-[#2563eb] bg-secondary/50 border-b border-sidebar-border">
               <div className="flex items-center gap-2">
                 <IconRefresh size={13} className="shrink-0 animate-spin [animation-direction:reverse] motion-reduce:animate-none" />
-                <span className="flex-1 min-w-0">{t('vc_build_pill')}</span>
+                <span className="flex-1 min-w-0">{buildPillText}</span>
               </div>
             </div>
           )}

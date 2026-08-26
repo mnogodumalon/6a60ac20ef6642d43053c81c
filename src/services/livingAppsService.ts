@@ -1,10 +1,12 @@
 // AUTOMATICALLY GENERATED SERVICE
 import { APP_IDS, LOOKUP_OPTIONS, FIELD_TYPES } from '@/types/app';
 import { ensureUploadableImage } from '@/lib/ai';
+import { REST_URL } from '@/lib/origin';
 import type { Projekte, Aufgaben, CreateProjekte, CreateAufgaben } from '@/types/app';
 
-// Base Configuration
-const API_BASE_URL = 'https://my.living-apps.de/rest';
+// Base Configuration — the host is a RUNTIME fact (lib/origin.ts):
+// a bundle copied to another LA instance must talk to THAT instance.
+const API_BASE_URL = REST_URL;
 
 // --- HELPER FUNCTIONS ---
 export function extractRecordId(url: unknown): string | null {
@@ -30,7 +32,7 @@ export function extractRecordIds(urls: unknown): string[] {
 }
 
 export function createRecordUrl(appId: string, recordId: string): string {
-  return `https://my.living-apps.de/rest/apps/${appId}/records/${recordId}`;
+  return `${API_BASE_URL}/apps/${appId}/records/${recordId}`;
 }
 
 export class LivingAppsApiError extends Error {
